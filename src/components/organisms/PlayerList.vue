@@ -1,32 +1,37 @@
 <template>
-  <ul ref="listRef" class="player-list" :style="{ height: playerListHeight }">
+  <TransitionGroup
+    ref="listRef"
+    tag="ul"
+    name="player-move"
+    class="player-list"
+    :style="{ height: playerListHeight }"
+  >
     <PlayerListItem
-      v-for="(item, i) in users"
-      :key="`Player${i}`"
+      v-for="(item, i) in orderedUsers"
+      :key="item"
       :item="item"
       :i="i"
       :is-host="isHost"
       :turn="turn"
-      :users="users"
+      :users="orderedUsers"
       :restart-users="restartUsers"
       :turn-timeout="turnTimeout"
       :seconds-left="secondsLeft"
-      :card-count="playerDecks[item]?.length ?? 0"
       :presence="presenceMap[item] ?? 'unknown'"
       @open="handleOpen"
     />
-    <Modal
-      :open="open"
-      @close="handleClose"
-    >
-      <div class="modal-content">
-        <h2>{{ t('waiting.confirmDelete') }}</h2>
-        <button class="game-button red game-button--in-game" @click="deleteHandler(deleteUser)">
-          {{ t('common.deleteUser') }}
-        </button>
-      </div>
-    </Modal>
-  </ul>
+  </TransitionGroup>
+  <Modal
+    :open="open"
+    @close="handleClose"
+  >
+    <div class="modal-content">
+      <h2>{{ t('waiting.confirmDelete') }}</h2>
+      <button class="game-button red game-button--in-game" @click="deleteHandler(deleteUser)">
+        {{ t('common.deleteUser') }}
+      </button>
+    </div>
+  </Modal>
 </template>
 
 <script setup lang="ts">
@@ -63,15 +68,32 @@ const { t } = useI18n()
 
 const open = ref(false)
 const deleteUser = ref('')
-const listRef = ref<HTMLElement | null>(null)
+const listRef = ref<{ $el: HTMLElement } | null>(null)
 
-// ターンが変わったら、現在のプレイヤーを横スクロールで中央に表示する
+// 手番の人を先頭（左端）にし、その右に「次の人」が並ぶように並べ替える。
+// リバース（isReturn）時は進行方向が逆になるため並び順も逆向きになる。
+const orderedUsers = computed(() => {
+  const list = props.users
+  const len = list.length
+  if (len === 0) return []
+  const start = list.indexOf(props.turn)
+  if (start === -1) return [...list]
+  const result: string[] = []
+  for (let n = 0; n < len; n++) {
+    const idx = props.isReturn
+      ? ((start - n) % len + len) % len
+      : (start + n) % len
+    result.push(list[idx])
+  }
+  return result
+})
+
+// ターンが変わったら、先頭（手番の人）が見えるよう左端へスクロールする
 watch(
   () => props.turn,
   async () => {
     await nextTick()
-    const activeEl = listRef.value?.querySelector('.is-active') as HTMLElement | null
-    activeEl?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+    listRef.value?.$el?.scrollTo({ left: 0, behavior: 'smooth' })
   }
 )
 
@@ -138,6 +160,17 @@ const deleteHandler = async (userToDelete: string) => {
   scroll-padding-inline: 12px;
   -webkit-overflow-scrolling: touch;
   height: 11vh;
+}
+
+// 並び替え（手番の進行）をインタラクティブに見せる FLIP アニメーション
+.player-move-move {
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .player-move-move {
+    transition: none;
+  }
 }
 
 .modal-content {

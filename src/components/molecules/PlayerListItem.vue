@@ -10,10 +10,6 @@
         />
       </span>
       <span class="player-name-text">{{ item }}</span>
-      <span class="player-cards" :aria-label="`${cardCount}`">
-        <span class="player-cards__icon" aria-hidden="true" />
-        {{ cardCount }}
-      </span>
       <span
         v-if="users[i] === turn"
         class="turn-indicator"
@@ -58,14 +54,12 @@ interface Props {
   restartUsers: string[]
   turnTimeout?: number
   secondsLeft?: number
-  cardCount?: number
   presence?: 'online' | 'offline' | 'unknown'
 }
 
 withDefaults(defineProps<Props>(), {
   turnTimeout: 0,
   secondsLeft: 0,
-  cardCount: 0,
   presence: 'unknown',
 })
 
@@ -157,25 +151,6 @@ const handleOpen = (user: string) => {
   font-size: $font-size-sm;
   font-weight: 700;
   letter-spacing: 0.01em;
-}
-
-.player-cards {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 12px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.player-cards__icon {
-  width: 10px;
-  height: 14px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
 .turn-indicator {
@@ -288,15 +263,6 @@ const handleOpen = (user: string) => {
 
 .is-active .player-name-text {
   color: #2a1c00;
-}
-
-.is-active .player-cards {
-  color: #2a1c00;
-}
-
-.is-active .player-cards__icon {
-  background: rgba(40, 22, 0, 0.75);
-  border-color: rgba(40, 22, 0, 0.5);
 }
 
 .is-active .delete-button {
