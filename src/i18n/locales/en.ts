@@ -54,6 +54,8 @@ export default {
     copied: 'Copied to clipboard!',
     confirmDelete: 'Delete this user?',
     confirmGoHome: 'Go back home?',
+    randomOrder: 'Start in random order',
+    dragToReorder: 'Drag to change the order',
   },
   play: {
     invalidValue: 'Invalid Value',

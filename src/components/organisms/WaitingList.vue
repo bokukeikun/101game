@@ -1,15 +1,30 @@
 <template>
   <div class="waiting-list">
     <h1 class="waiting-list__title">{{ t('waiting.waitingForPlayer') }}</h1>
+    <p v-if="isHost && users.length > 1" class="waiting-list__hint">
+      {{ t('waiting.dragToReorder') }}
+    </p>
     <div class="waiting-users">
-      <WaitingListItem
-        v-for="(user, i) in users"
-        :key="`Item${i}`"
-        :user="user"
-        :i="i"
-        :is-host="isHost"
-        @open="handleOpen"
-      />
+      <draggable
+        v-model="orderedUsers"
+        :item-key="itemKey"
+        handle=".drag-handle"
+        :disabled="!isHost"
+        :animation="180"
+        ghost-class="sortable-ghost"
+        chosen-class="sortable-chosen"
+        @end="persistOrder"
+      >
+        <template #item="{ element, index }">
+          <WaitingListItem
+            :user="element"
+            :i="index"
+            :is-host="isHost"
+            :host-name="hostName"
+            @open="handleOpen"
+          />
+        </template>
+      </draggable>
       <p v-if="users.length === 0" class="waiting-users__empty">
         {{ t('waiting.inviteOthers') }}
       </p>
@@ -32,10 +47,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { updateDoc, getDoc, doc } from 'firebase/firestore'
 import { getFirestoreDB } from '@/services/firebase/config'
+// @ts-expect-error vuedraggable は型定義を同梱していないため
+import draggable from 'vuedraggable'
 import WaitingListItem from '@/components/molecules/WaitingListItem.vue'
 import Modal from '@/components/molecules/Modal.vue'
 
@@ -43,16 +60,45 @@ interface Props {
   users: string[]
   roomCode: string
   isHost?: boolean
+  restartUsers?: string[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isHost: false,
+  restartUsers: () => [],
 })
 
 const { t } = useI18n()
 
 const open = ref(false)
 const deleteUser = ref('')
+
+// ルーム作成者（ホスト）。並べ替えても削除保護に使う。
+const hostName = computed(() => props.restartUsers[0] ?? '')
+
+// ドラッグ並べ替え用のローカルコピー。Firestore のスナップショット更新で同期する。
+const orderedUsers = ref<string[]>([...props.users])
+watch(
+  () => props.users,
+  (val) => {
+    orderedUsers.value = [...val]
+  }
+)
+
+const itemKey = (el: string) => el
+
+// ホストが並べ替えたら、その順番（＝手番の進行順）を Firestore に保存する。
+// restartUsers は作成者判定（先頭）に使うため触らず、users のみ更新する。
+const persistOrder = async () => {
+  if (!props.isHost) return
+  try {
+    await updateDoc(doc(getFirestoreDB(), 'users', props.roomCode), {
+      users: [...orderedUsers.value],
+    })
+  } catch (error) {
+    console.error('Error reordering users:', error)
+  }
+}
 
 const handleOpen = (user: string) => {
   deleteUser.value = user
@@ -106,6 +152,14 @@ const deleteHandler = async (userToDelete: string) => {
   @include respond-to(md) {
     font-size: $font-size-xl;
   }
+}
+
+.waiting-list__hint {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: $font-size-sm;
+  text-align: center;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 .waiting-users {

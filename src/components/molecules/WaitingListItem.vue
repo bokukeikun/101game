@@ -1,6 +1,16 @@
 <template>
-  <div class="waiting-user">
+  <div class="waiting-user" :class="{ 'is-draggable': isHost }">
     <div class="waiting-item">
+      <span
+        v-if="isHost"
+        class="drag-handle"
+        aria-hidden="true"
+        :aria-label="`Reorder ${user}`"
+      >
+        <span class="drag-handle__bar" />
+        <span class="drag-handle__bar" />
+        <span class="drag-handle__bar" />
+      </span>
       <div class="waiting-icon" aria-hidden="true">
         <span class="icon">👤</span>
       </div>
@@ -11,11 +21,11 @@
       <button
         v-if="isHost"
         class="delete-button"
-        :disabled="i === 0"
+        :disabled="isHostUser"
         @click="handleOpen(user)"
         :aria-label="`Delete ${user}`"
       >
-        <span class="delete-icon" :class="{ invisible: i === 0 }">×</span>
+        <span class="delete-icon" :class="{ invisible: isHostUser }">×</span>
       </button>
       <button
         v-else
@@ -30,13 +40,21 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+
 interface Props {
   user: string
   i: number
   isHost: boolean
+  hostName?: string
 }
 
-defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  hostName: '',
+})
+
+// ルーム作成者（ホスト）は削除不可。並べ替えで先頭以外に来ても保護する。
+const isHostUser = computed(() => props.user === props.hostName)
 
 const emit = defineEmits<{
   (e: 'open', user: string): void
@@ -64,6 +82,42 @@ const handleOpen = (user: string) => {
   background: rgba(255, 255, 255, 0.14);
   border-radius: $border-radius-md;
   border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.drag-handle {
+  flex-shrink: 0;
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  width: 24px;
+  height: 28px;
+  padding: 0 4px;
+  margin-left: -4px;
+  cursor: grab;
+  touch-action: none;
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  &__bar {
+    display: block;
+    width: 100%;
+    height: 2px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.55);
+  }
+}
+
+// ドラッグ中のゴースト要素
+.sortable-ghost .waiting-item {
+  opacity: 0.4;
+}
+
+.sortable-chosen .waiting-item {
+  background: rgba(255, 255, 255, 0.24);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
 .waiting-icon {

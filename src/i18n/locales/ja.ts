@@ -54,6 +54,8 @@ export default {
     copied: 'クリップボードにコピーしました！',
     confirmDelete: '削除しますか？',
     confirmGoHome: 'ホームに戻りますか？',
+    randomOrder: 'ランダムな順番で始める',
+    dragToReorder: 'ドラッグで順番を変更できます',
   },
   play: {
     invalidValue: '無効な値です',

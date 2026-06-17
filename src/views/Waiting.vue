@@ -4,6 +4,7 @@
       :users="roomStore.users"
       :room-code="roomStore.roomCode"
       :is-host="roomStore.isHost"
+      :restart-users="roomStore.restartUsers"
     >
       <Warning
         v-if="isOnlyHost"
@@ -12,6 +13,14 @@
         variant="info"
       />
       <div v-if="roomStore.isHost" class="waiting__host-actions">
+        <label class="waiting__random-toggle">
+          <input
+            v-model="randomOrder"
+            type="checkbox"
+            class="waiting__random-checkbox"
+          />
+          <span>{{ t('waiting.randomOrder') }}</span>
+        </label>
         <div class="waiting__primary-actions">
           <button
             class="game-button red game-button--in-game"
@@ -54,12 +63,11 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { doc, updateDoc } from 'firebase/firestore'
+import { doc, writeBatch } from 'firebase/firestore'
 import { getFirestoreDB } from '@/services/firebase/config'
 import { useRoomStore } from '@/stores/room'
 import packOfCards from '@/utils/packOfCards'
 import shuffleArray from '@/utils/shuffleArray'
-import getRandomInt from '@/utils/getRandomInt'
 import WaitingList from '@/components/organisms/WaitingList.vue'
 import Warning from '@/components/molecules/Warning.vue'
 import GameGuide from '@/components/molecules/GameGuide.vue'
@@ -75,6 +83,7 @@ const { t } = useI18n()
 const loading = ref(false)
 const isOnlyHost = ref(false)
 const guideOpen = ref(false)
+const randomOrder = ref(false)
 
 const soloWarningMessage = computed(() => {
   return `${t('waiting.cantStartAlone')} ${t('waiting.inviteOthers')}`
@@ -94,20 +103,33 @@ const handleStart = async () => {
   try {
     const shuffledCards = shuffleArray([...packOfCards])
 
+    // 開始順（＝手番の進行順）。ランダム指定時はシャッフル、
+    // そうでなければホストがドラッグで並べた現在の順番で開始する。
+    const orderedUsers = randomOrder.value
+      ? shuffleArray([...roomStore.users])
+      : [...roomStore.users]
+
     const decks: Record<string, string[]> = {}
-    const users = [...roomStore.users]
-    for (let i = 0; i < users.length; i++) {
-      decks[users[i]] = shuffledCards.splice(0, 3)
+    for (let i = 0; i < orderedUsers.length; i++) {
+      decks[orderedUsers[i]] = shuffledCards.splice(0, 3)
     }
     const drawCardPile = shuffledCards
 
-    await updateDoc(doc(getFirestoreDB(), 'initGameState', roomStore.roomCode), {
-      turn: users[getRandomInt(0, users.length)],
-      winner: users,
+    const db = getFirestoreDB()
+    const batch = writeBatch(db)
+    // 手番進行は users の並び順に依存するため、開始順を users にも反映する。
+    batch.update(doc(db, 'users', roomStore.roomCode), {
+      users: orderedUsers,
+    })
+    batch.update(doc(db, 'initGameState', roomStore.roomCode), {
+      // 先頭のプレイヤーから開始する。
+      turn: orderedUsers[0],
+      winner: orderedUsers,
       startFlag: true,
       playerDecks: decks,
       drawCardPile: [...drawCardPile],
     })
+    await batch.commit()
   } catch (error) {
     console.error('Error starting game:', error)
   } finally {
@@ -151,15 +173,41 @@ const handleCopyLink = async () => {
 .waiting__host-actions {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  gap: $spacing-sm;
+  width: 100%;
+
+  :deep(.game-button) {
+    width: 50%;
+  }
+}
+
+.waiting__primary-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: $spacing-sm;
   width: 100%;
 }
 
-.waiting__primary-actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
-  gap: $spacing-sm;
-  width: 100%;
+.waiting__random-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-xs;
+  padding: $spacing-xs $spacing-sm;
+  color: white;
+  font-family: 'Carter One', sans-serif;
+  font-size: 0.9rem;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  user-select: none;
+}
+
+.waiting__random-checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: #d34a36;
+  cursor: pointer;
 }
 
 .waiting__client-actions {
@@ -168,6 +216,10 @@ const handleCopyLink = async () => {
   align-items: center;
   gap: $spacing-md;
   width: 100%;
+
+  :deep(.game-button) {
+    width: 50%;
+  }
 }
 
 .waiting__client-message {
