@@ -1,5 +1,6 @@
 ﻿{
   "projects": {
-    "default": "vue-101-game"
+    "default": "vue-101-game",
+    "dev": "vue-101-game-dev"
   }
 }

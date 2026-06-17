@@ -1,5 +1,5 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app'
-import { getFirestore, type Firestore } from 'firebase/firestore'
+import { connectFirestoreEmulator, getFirestore, type Firestore } from 'firebase/firestore'
 import { getAuth, type Auth } from 'firebase/auth'
 import { getFunctions, type Functions } from 'firebase/functions'
 
@@ -12,22 +12,43 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
 }
 
-// Firebase設定が不完全な場合の警告
+const useEmulator =
+  import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true'
+
+const emulatorHost = import.meta.env.VITE_FIRESTORE_EMULATOR_HOST || '127.0.0.1'
+const emulatorPort = Number(import.meta.env.VITE_FIRESTORE_EMULATOR_PORT || 8080)
+
 if (import.meta.env.DEV && !firebaseConfig.projectId) {
   console.error(
     '⚠️ Firebase設定が見つかりません！\n' +
-    '以下の手順で設定してください：\n' +
-    '1. .env.localファイルをプロジェクトルートに作成\n' +
-    '2. env.exampleを参考にFirebase設定を追加\n' +
-    '3. 開発サーバーを再起動'
+      '以下の手順で設定してください：\n' +
+      '1. .env.localファイルをプロジェクトルートに作成\n' +
+      '2. env.exampleを参考にFirebase設定を追加\n' +
+      '3. 開発サーバーを再起動'
   )
 }
 
-// シングルトンパターンで初期化
+if (useEmulator) {
+  console.info(
+    `🔧 Firestore Emulator に接続します（${emulatorHost}:${emulatorPort}）— 本番データには影響しません`
+  )
+} else if (
+  import.meta.env.DEV &&
+  firebaseConfig.projectId === 'vue-101-game'
+) {
+  console.warn(
+    '⚠️ 本番 Firebase プロジェクト（vue-101-game）に接続しています。\n' +
+      '開発用プロジェクト（.env.development.local）または yarn dev:emulator を使用してください。'
+  )
+}
+
 let app: FirebaseApp | null = null
 let db: Firestore | null = null
 let auth: Auth | null = null
 let functions: Functions | null = null
+let emulatorConnected = false
+
+export const isUsingFirestoreEmulator = (): boolean => useEmulator
 
 export const getFirebaseApp = (): FirebaseApp => {
   if (!app) {
@@ -39,6 +60,10 @@ export const getFirebaseApp = (): FirebaseApp => {
 export const getFirestoreDB = (): Firestore => {
   if (!db) {
     db = getFirestore(getFirebaseApp())
+    if (useEmulator && !emulatorConnected) {
+      connectFirestoreEmulator(db, emulatorHost, emulatorPort)
+      emulatorConnected = true
+    }
   }
   return db
 }
