@@ -15,6 +15,12 @@ export const useRoomStore = defineStore('room', () => {
     return !startFlag.value && users.value.length < 6 && !isRoomFull.value
   })
 
+  // ホスト(H)/参加者(C)プレフィックスを除いた表示名
+  const currentPlayerName = computed(() => {
+    const user = currentUser.value
+    return user.startsWith('H') || user.startsWith('C') ? user.slice(1) : user
+  })
+
   function setRoomCode(code: string) {
     roomCode.value = code
   }
@@ -60,6 +66,7 @@ export const useRoomStore = defineStore('room', () => {
     startFlag,
     isRoomFull,
     canJoin,
+    currentPlayerName,
     setRoomCode,
     setCurrentUser,
     setUsers,

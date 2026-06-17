@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { Timestamp } from 'firebase/firestore'
+import { useRoomStore } from './room'
 
 export interface GameState {
   startFlag: boolean
@@ -17,6 +17,7 @@ export interface GameState {
   isReturn: boolean
   ranking: string[]
   missPlayer: string
+  turnTimeout: number
 }
 
 export const useGameStore = defineStore('game', () => {
@@ -35,11 +36,12 @@ export const useGameStore = defineStore('game', () => {
   const isReturn = ref(false)
   const ranking = ref<string[]>([])
   const missPlayer = ref('')
+  const turnTimeout = ref(0)
 
   const isGameActive = computed(() => startFlag.value && !gameOver.value)
   const isMyTurn = computed(() => {
-    // currentUserとturnを比較する必要がある
-    return false // TODO: currentUserとturnを比較
+    const roomStore = useRoomStore()
+    return turn.value !== '' && turn.value === roomStore.currentPlayerName
   })
 
   function setLoading(value: boolean) {
@@ -61,6 +63,7 @@ export const useGameStore = defineStore('game', () => {
     if (state.isReturn !== undefined) isReturn.value = state.isReturn
     if (state.ranking !== undefined) ranking.value = state.ranking
     if (state.missPlayer !== undefined) missPlayer.value = state.missPlayer
+    if (state.turnTimeout !== undefined) turnTimeout.value = state.turnTimeout
   }
 
   function reset() {
@@ -79,6 +82,7 @@ export const useGameStore = defineStore('game', () => {
     isReturn.value = false
     ranking.value = []
     missPlayer.value = ''
+    turnTimeout.value = 0
   }
 
   return {
@@ -97,6 +101,7 @@ export const useGameStore = defineStore('game', () => {
     isReturn,
     ranking,
     missPlayer,
+    turnTimeout,
     isGameActive,
     isMyTurn,
     setLoading,
