@@ -1,0 +1,59 @@
+---
+description: 101ゲームプロジェクトの基本ルールと構成
+alwaysApply: true
+---
+
+# 101 Game — Project Rules
+
+## Stack
+
+Vue 3 + Vite + TypeScript + Pinia + Firebase + SCSS。Node 20.11.0 / Yarn 3.6.4（Volta）。
+
+## Structure
+
+- `src/components/{atoms,molecules,organisms}/` — Atomic Design
+- `src/views/` — ページ
+- `src/stores/` — Pinia（room, game, user）
+- `src/assets/styles/` — グローバル SCSS（`game.scss` にボタンスタイル）
+
+## Commands
+
+```bash
+yarn dev              # 開発用 Firebase プロジェクト
+yarn dev:emulator     # Emulator（代替）
+yarn deploy:firestore:dev
+yarn build:prod
+yarn deploy           # 本番のみ
+```
+
+## Design: Mobile First
+
+- **モバイル優先** — スマホでの使いやすさを第一に。基本スタイルはモバイル向け
+- `@include respond-to(md)` 以降でタブレット・PC向けに拡張（`min-width`）
+- タップ領域・余白・フォントサイズはモバイルで十分に確保
+- **Web でも使える** — 大画面では max-width・中央寄せ等でレイアウト拡張
+- ホバーは `@media (hover: hover)` で付与（タッチ端末を考慮）
+- UI 変更時はモバイル幅を先に確認し、デスクトップも確認する
+
+## Conventions
+
+- `<script setup lang="ts">` + Composition API
+- Mobile First スタイル → `respond-to(md)` でデスクトップ拡張
+- ゲームボタン: `.game-button.orange|red|green`
+- Firebase: 開発は `.env.development.local`（dev プロジェクト）。Emulator は `yarn dev:emulator`
+- 変更は最小スコープ。不要なドキュメント追加・commit はしない
+- UI 文言は `vue-i18n`（デフォルト日本語）
+
+## Do Not
+
+- トップページに白背景パネルを勝手に追加しない（背景 GIF と馴染ませる）
+- `game-button:disabled` の opacity 低下をトップページに適用しない
+- **CSS 変更後にモバイル確認（localhost + DevTools 375px）をせず終了しない**
+
+## CSS 変更時
+
+1. `yarn dev` 起動
+2. モバイル幅（375px）で変更箇所を確認
+3. 重なり・崩れがなければ完了
+
+詳細は `AGENTS.md` を参照。
