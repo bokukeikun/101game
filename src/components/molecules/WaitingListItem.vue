@@ -1,11 +1,13 @@
 <template>
   <div class="waiting-user">
     <div class="waiting-item">
-      <div class="waiting-icon">
+      <div class="waiting-icon" aria-hidden="true">
         <span class="icon">👤</span>
       </div>
-      <div class="waiting-label">Player {{ i + 1 }}</div>
-      <div class="waiting-name">{{ user }}</div>
+      <div class="waiting-item__info">
+        <span class="waiting-label">Player {{ i + 1 }}</span>
+        <span class="waiting-name">{{ user }}</span>
+      </div>
       <button
         v-if="isHost"
         class="delete-button"
@@ -34,7 +36,7 @@ interface Props {
   isHost: boolean
 }
 
-const props = defineProps<Props>()
+defineProps<Props>()
 
 const emit = defineEmits<{
   (e: 'open', user: string): void
@@ -47,51 +49,68 @@ const handleOpen = (user: string) => {
 
 <style lang="scss" scoped>
 .waiting-user {
-  margin-bottom: $spacing-sm;
+  margin-bottom: $spacing-xs;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
 }
 
 .waiting-item {
   display: flex;
   align-items: center;
-  gap: $spacing-md;
+  gap: $spacing-sm;
   padding: $spacing-sm $spacing-md;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: $border-radius-sm;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: $border-radius-md;
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .waiting-icon {
-  width: 40px;
-  height: 40px;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
   @include flex-center;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
 }
 
 .icon {
-  font-size: 24px;
+  font-size: 18px;
+}
+
+.waiting-item__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .waiting-label {
   font-family: 'Carter One', sans-serif;
-  font-size: 1rem;
-  font-weight: 1000;
-  color: white;
-  min-width: 100px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .waiting-name {
   font-family: 'Carter One', sans-serif;
-  font-size: 1.4rem;
+  font-size: 1rem;
   font-weight: 1000;
   color: white;
-  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .delete-button {
+  flex-shrink: 0;
   background: transparent;
   border: none;
   cursor: pointer;
   padding: $spacing-xs;
   color: $error-color;
-  font-size: $font-size-lg;
   transition: opacity 0.2s;
 
   &:hover:not(:disabled) {
@@ -104,12 +123,13 @@ const handleOpen = (user: string) => {
 }
 
 .delete-icon {
-  display: inline-block;
-  width: 32px;
-  height: 32px;
-  line-height: 32px;
-  text-align: center;
-  font-size: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  font-size: 22px;
+  line-height: 1;
 
   &.invisible {
     opacity: 0;

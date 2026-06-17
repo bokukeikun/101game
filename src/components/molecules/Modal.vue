@@ -46,7 +46,8 @@ const handleBackdropClick = () => {
 }
 
 .modal-container {
-  width: 400px;
+  box-sizing: border-box;
+  width: min(400px, calc(100vw - 32px));
   text-align: center;
   border: 2px solid #fff;
   border-radius: 10px;

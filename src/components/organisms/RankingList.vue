@@ -1,13 +1,15 @@
 <template>
   <div class="ranking">
-    <h1 class="top-info-text">RANKING</h1>
+    <h1 class="top-info-text">{{ t('common.ranking') }}</h1>
+    <p class="winner-banner">🎉 {{ t('ranking.winnerBanner', { name: winner }) }}</p>
     <div class="ranking-users" :style="{ height: rankingUsersHeight }">
-      <RankingListItem :i="1" :item="winner" />
+      <RankingListItem :i="1" :item="winner" :is-me="winner === meName" />
       <RankingListItem
         v-for="(item, i) in reversedRanking"
         :key="`Ranking${i + 2}`"
         :i="i + 2"
         :item="item"
+        :is-me="item === meName"
       />
     </div>
   </div>
@@ -15,7 +17,9 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import RankingListItem from '@/components/molecules/RankingListItem.vue'
+import { useRoomStore } from '@/stores/room'
 
 interface Props {
   height?: number
@@ -24,6 +28,11 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
+const { t } = useI18n()
+const roomStore = useRoomStore()
+
+const meName = computed(() => roomStore.currentPlayerName)
 
 const rankingUsersHeight = computed(() => {
   return props.height ? `${(props.height * 35) / 100}px` : '35vh'
@@ -47,7 +56,17 @@ const reversedRanking = computed(() => {
   font-size: $font-size-xl;
   font-weight: 1000;
   color: white;
-  margin-bottom: $spacing-md;
+  margin-bottom: $spacing-xs;
+}
+
+.winner-banner {
+  margin: 0 0 $spacing-sm;
+  font-family: 'Carter One', sans-serif;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #ffd766;
+  text-align: center;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
 }
 
 .ranking-users {

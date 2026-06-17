@@ -1,21 +1,24 @@
 <template>
-  <div class="ranking" :style="{ height: rankingHeight }">
+  <div class="ranking">
     <template v-if="gameStore.winner && gameStore.winner.length > 0">
+      <Confetti />
       <RankingList
         :height="height"
         :ranking="gameStore.ranking"
         :winner="gameStore.winner[0] || ''"
       />
-      <div class="button-list" :style="{ height: buttonListHeight }">
+      <div class="button-list">
         <div v-if="roomStore.isHost" class="host-actions">
-          <button class="game-button red" @click="restartHandler">
-            RESTART
+          <button class="game-button red game-button--in-game" @click="restartHandler">
+            {{ t('common.restart') }}
           </button>
-          <button class="game-button" @click="quitHostHandler">QUIT</button>
+          <button class="game-button game-button--in-game" @click="quitHostHandler">
+            {{ t('common.quit') }}
+          </button>
         </div>
         <div v-else class="client-actions">
-          <h3>Please wait for the host to restart</h3>
-          <div class="loader" style="margin: 4% 50%">Loading...</div>
+          <h3>{{ t('ranking.waitForRestart') }}</h3>
+          <div class="loader" style="margin: 4% 50%">{{ t('common.loading') }}</div>
         </div>
       </div>
     </template>
@@ -24,25 +27,21 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { updateDoc, doc, deleteDoc } from 'firebase/firestore'
+import { useI18n } from 'vue-i18n'
+import { updateDoc, doc } from 'firebase/firestore'
 import { getFirestoreDB } from '@/services/firebase/config'
 import { useRoomStore } from '@/stores/room'
 import { useGameStore } from '@/stores/game'
+import { useGameActions } from '@/composables/useGameActions'
 import RankingList from '@/components/organisms/RankingList.vue'
-import Spinner from '@/components/atoms/Spinner.vue'
+import Confetti from '@/components/atoms/Confetti.vue'
 
-const router = useRouter()
 const roomStore = useRoomStore()
 const gameStore = useGameStore()
+const { endGameAsHost } = useGameActions()
+const { t } = useI18n()
 
 const height = computed(() => window.innerHeight)
-const rankingHeight = computed(() => {
-  return height.value ? `${(height.value * 85) / 100}px` : '85vh'
-})
-const buttonListHeight = computed(() => {
-  return height.value ? `${(height.value * 20) / 100}px` : '20vh'
-})
 
 const restartHandler = async () => {
   const playedCardsPile = ['N00']
@@ -72,73 +71,41 @@ const restartHandler = async () => {
   )
 }
 
-const quitHostHandler = async () => {
-  await updateDoc(doc(getFirestoreDB(), 'users', roomStore.roomCode), {
-    restartUsers: [],
-    users: [],
-  })
-  await deleteDoc(
-    doc(getFirestoreDB(), 'initGameState', roomStore.roomCode)
-  )
-  await deleteDoc(doc(getFirestoreDB(), 'users', roomStore.roomCode))
-  roomStore.reset()
-  gameStore.reset()
-  router.push('/')
-}
+const quitHostHandler = endGameAsHost
 </script>
 
 <style lang="scss" scoped>
 .ranking {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   padding: $spacing-md;
 }
 
 .button-list {
-  margin: 4vh 0 0;
-  height: 20vh;
+  flex-shrink: 0;
+  margin-top: auto;
+  padding-top: $spacing-md;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.host-actions,
-.client-actions {
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-md;
-  align-items: center;
+.host-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: $spacing-sm;
+  width: 100%;
+  max-width: 360px;
 }
 
 .client-actions {
+  text-align: center;
+
   h3 {
     color: white;
     margin-bottom: $spacing-md;
-  }
-}
-
-.game-button {
-  padding: $spacing-md $spacing-lg;
-  font-size: $font-size-lg;
-  font-weight: bold;
-  border: 2px solid white;
-  border-radius: $border-radius-md;
-  background-color: $primary-color;
-  color: white;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    background-color: $primary-hover;
-    transform: scale(1.05);
-  }
-
-  &.red {
-    background-color: $error-color;
-
-    &:hover {
-      background-color: darken($error-color, 10%);
-    }
   }
 }
 </style>

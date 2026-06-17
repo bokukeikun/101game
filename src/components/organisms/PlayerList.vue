@@ -1,5 +1,5 @@
 <template>
-  <ul class="player-list" :style="{ height: playerListHeight }">
+  <ul ref="listRef" class="player-list" :style="{ height: playerListHeight }">
     <PlayerListItem
       v-for="(item, i) in users"
       :key="`Player${i}`"
@@ -9,6 +9,10 @@
       :turn="turn"
       :users="users"
       :restart-users="restartUsers"
+      :turn-timeout="turnTimeout"
+      :seconds-left="secondsLeft"
+      :card-count="playerDecks[item]?.length ?? 0"
+      :presence="presenceMap[item] ?? 'unknown'"
       @open="handleOpen"
     />
     <Modal
@@ -16,9 +20,9 @@
       @close="handleClose"
     >
       <div class="modal-content">
-        <h2>削除しますか？</h2>
-        <button class="game-button red" @click="deleteHandler(deleteUser)">
-          Delete User
+        <h2>{{ t('waiting.confirmDelete') }}</h2>
+        <button class="game-button red game-button--in-game" @click="deleteHandler(deleteUser)">
+          {{ t('common.deleteUser') }}
         </button>
       </div>
     </Modal>
@@ -26,11 +30,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { updateDoc, getDoc, doc } from 'firebase/firestore'
+import { ref, computed, watch, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { writeBatch, getDoc, doc } from 'firebase/firestore'
 import { getFirestoreDB } from '@/services/firebase/config'
 import PlayerListItem from '@/components/molecules/PlayerListItem.vue'
 import Modal from '@/components/molecules/Modal.vue'
+import { getTurnAfter } from '@/utils/turn'
 
 interface Props {
   height?: number
@@ -42,15 +48,35 @@ interface Props {
   restartUsers: string[]
   isHost: boolean
   turn: string
+  turnTimeout?: number
+  secondsLeft?: number
+  presenceMap?: Record<string, string>
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  turnTimeout: 0,
+  secondsLeft: 0,
+  presenceMap: () => ({}),
+})
+
+const { t } = useI18n()
 
 const open = ref(false)
 const deleteUser = ref('')
+const listRef = ref<HTMLElement | null>(null)
+
+// ターンが変わったら、現在のプレイヤーを横スクロールで中央に表示する
+watch(
+  () => props.turn,
+  async () => {
+    await nextTick()
+    const activeEl = listRef.value?.querySelector('.is-active') as HTMLElement | null
+    activeEl?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+  }
+)
 
 const playerListHeight = computed(() => {
-  return props.height ? `${(props.height * 11) / 100}px` : '11vh'
+  return props.height ? `${(props.height * 12) / 100}px` : '11vh'
 })
 
 const handleOpen = (user: string) => {
@@ -63,6 +89,8 @@ const handleClose = () => {
 }
 
 const deleteHandler = async (userToDelete: string) => {
+  // 先にモーダルを閉じる（非同期更新の完了を待たずに UI を確定させる）
+  handleClose()
   try {
     const newPlayerDecks: Record<string, string[]> = {}
     for (let i = 0; i < props.users.length; i++) {
@@ -71,32 +99,26 @@ const deleteHandler = async (userToDelete: string) => {
       }
     }
     const newWinner = props.winner.filter((item) => item !== userToDelete)
-    const deleteUserIndex = props.users.indexOf(userToDelete)
-    const nextTurn =
-      deleteUserIndex === props.users.length - 1
-        ? props.users[0]
-        : props.users[deleteUserIndex + 1]
-    const returnNextTurn =
-      deleteUserIndex === 0
-        ? props.users[props.users.length - 1]
-        : props.users[deleteUserIndex - 1]
+    const nextTurn = getTurnAfter(props.users, userToDelete, props.isReturn)
 
-    const usersData = await getDoc(doc(getFirestoreDB(), 'users', props.roomCode))
+    const db = getFirestoreDB()
+    const usersData = await getDoc(doc(db, 'users', props.roomCode))
     const newUsers = usersData
       .data()
       ?.restartUsers.filter((user: string) => userToDelete !== user) || []
 
-    await updateDoc(doc(getFirestoreDB(), 'users', props.roomCode), {
+    const batch = writeBatch(db)
+    batch.update(doc(db, 'users', props.roomCode), {
       restartUsers: newUsers,
       users: newUsers,
     })
-    await updateDoc(doc(getFirestoreDB(), 'initGameState', props.roomCode), {
+    batch.update(doc(db, 'initGameState', props.roomCode), {
       gameOver: newWinner.length === 1,
       winner: newWinner,
-      turn: props.isReturn ? returnNextTurn : nextTurn,
+      turn: nextTurn,
       playerDecks: newPlayerDecks,
     })
-    handleClose()
+    await batch.commit()
   } catch (error) {
     console.error('Error deleting user:', error)
   }
@@ -105,11 +127,15 @@ const deleteHandler = async (userToDelete: string) => {
 
 <style lang="scss" scoped>
 .player-list {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
   list-style: none;
-  padding: 1vh 0 0;
+  padding: 1vh $spacing-sm 0;
   margin: 0;
   overflow-x: auto;
   white-space: nowrap;
+  scroll-padding-inline: 12px;
   -webkit-overflow-scrolling: touch;
   height: 11vh;
 }
@@ -121,27 +147,6 @@ const deleteHandler = async (userToDelete: string) => {
   h2 {
     margin-bottom: $spacing-lg;
     color: white;
-  }
-}
-
-.game-button {
-  padding: $spacing-md $spacing-lg;
-  font-size: $font-size-lg;
-  font-weight: bold;
-  border: 2px solid white;
-  border-radius: $border-radius-md;
-  background-color: $error-color;
-  color: white;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    background-color: darken($error-color, 10%);
-    transform: scale(1.05);
-  }
-
-  &.red {
-    background-color: $error-color;
   }
 }
 </style>

@@ -6,29 +6,35 @@
         class="input-name"
         type="text"
         name="name"
-        maxlength="7"
-        placeholder="Name"
+        :maxlength="MAX_NAME_LENGTH"
+        :placeholder="t('common.name')"
         :disabled="loading"
+        @beforeinput="onBeforeInput"
+        @paste="onPaste"
       />
-      <button type="submit" class="game-button green" :disabled="loading || name.length === 0">
+      <button type="submit" class="game-button green game-button--in-game" :disabled="loading || name.length === 0">
         <Spinner v-if="loading" small />
-        <span v-else>JOIN GAME</span>
+        <span v-else>{{ t('home.joinGame') }}</span>
       </button>
     </div>
-    <Warning :show="isGameStart" message="This Room has already started" />
-    <Warning :show="isNameExist" message="The name is already in use" />
-    <Warning :show="isNameLength" message="Up to 6 characters" />
-    <Warning :show="isRoomFull" message="This Room is Full" />
-    <Warning :show="!!errorMessage" :message="errorMessage" />
+    <div class="form-alerts">
+      <Warning :show="isGameStart" :message="t('join.roomStarted')" />
+      <Warning :show="isNameExist" :message="t('join.nameInUse')" />
+      <Warning :show="isNameLength" :message="t('home.nameMaxLength')" />
+      <Warning :show="isRoomFull" :message="t('join.roomFull')" />
+      <Warning :show="!!errorMessage" :message="errorMessage" />
+    </div>
   </form>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { doc, getDoc, updateDoc } from 'firebase/firestore'
 import { getFirestoreDB } from '@/services/firebase/config'
 import { useRoomStore } from '@/stores/room'
+import { useNameInput, MAX_NAME_LENGTH } from '@/composables/useNameInput'
 import Spinner from '@/components/atoms/Spinner.vue'
 import Warning from '@/components/molecules/Warning.vue'
 
@@ -38,10 +44,10 @@ const props = defineProps<{
 
 const router = useRouter()
 const roomStore = useRoomStore()
+const { t } = useI18n()
 
-const name = ref('')
+const { name, isNameLength, onBeforeInput, onPaste } = useNameInput()
 const loading = ref(false)
-const isNameLength = ref(false)
 const isNameExist = ref(false)
 const isRoomFull = ref(false)
 const isGameStart = ref(false)
@@ -58,10 +64,8 @@ const sleepSetFunction = async (setFunc: (value: boolean) => void) => {
 const handleSubmit = async () => {
   if (name.value.length === 0) return
 
-  if (name.value.length > 6) {
-    await sleepSetFunction((val) => {
-      isNameLength.value = val
-    })
+  if (name.value.length > MAX_NAME_LENGTH) {
+    isNameLength.value = true
     return
   }
 
@@ -83,7 +87,7 @@ const handleSubmit = async () => {
     const usersData = await getDoc(doc(db, 'users', props.roomCode))
     const userData = usersData.data()
     if (!userData) {
-      errorMessage.value = 'ルームが見つかりません'
+      errorMessage.value = t('join.roomNotFound')
       await sleep(3000)
       errorMessage.value = ''
       loading.value = false
@@ -111,15 +115,16 @@ const handleSubmit = async () => {
     }
   } catch (error: any) {
     console.error('Error joining room:', error)
-    // Firebase設定エラーの場合
     if (error.code === 'failed-precondition' || error.message?.includes('Firebase')) {
-      errorMessage.value = 'Firebase設定エラー: .env.localファイルを確認してください'
+      errorMessage.value = t('errors.firebaseConfig')
     } else if (error.code === 'permission-denied') {
-      errorMessage.value = '権限エラー: Firestoreのセキュリティルールを確認してください'
+      errorMessage.value = t('errors.permissionDenied')
     } else if (error.code === 'not-found') {
-      errorMessage.value = 'ルームが見つかりません'
+      errorMessage.value = t('join.roomNotFound')
     } else {
-      errorMessage.value = `エラーが発生しました: ${error.message || '不明なエラー'}`
+      errorMessage.value = t('errors.unknown', {
+        message: error.message || t('errors.unknownError'),
+      })
     }
     await sleep(3000)
     errorMessage.value = ''
@@ -136,6 +141,7 @@ const handleSubmit = async () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: $spacing-md;
 }
 
 .homepage-join {
@@ -145,6 +151,15 @@ const handleSubmit = async () => {
   justify-content: center;
   gap: $spacing-md;
   width: 100%;
+  max-width: 320px;
+}
+
+.form-alerts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  gap: $spacing-sm;
 }
 
 .input-name {
@@ -164,6 +179,4 @@ const handleSubmit = async () => {
     cursor: not-allowed;
   }
 }
-
-// ゲームボタンのスタイルはgame.scssで定義
 </style>

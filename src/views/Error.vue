@@ -5,16 +5,19 @@
         <img class="error-logo" :src="logoImage" alt="logo" />
       </div>
     </div>
-    <h1>404</h1>
-    <p>Sorry, the page you're looking for can not found.</p>
-    <router-link to="/">
-      <button class="game-button red">Go Back Home</button>
+    <h1>{{ t('errorPage.title') }}</h1>
+    <p>{{ t('errorPage.message') }}</p>
+    <router-link class="error__link" to="/">
+      <button class="game-button red game-button--in-game">{{ t('errorPage.goBackHome') }}</button>
     </router-link>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import logoImage from '@/assets/images/logo.png'
+
+const { t } = useI18n()
 </script>
 
 <style lang="scss" scoped>
@@ -56,26 +59,9 @@ p {
   margin-bottom: $spacing-lg;
 }
 
-.game-button {
-  padding: $spacing-md $spacing-lg;
-  font-size: $font-size-lg;
-  font-weight: bold;
-  border: 2px solid white;
-  border-radius: $border-radius-md;
-  background-color: $error-color;
-  color: white;
-  cursor: pointer;
-  transition: all 0.2s;
+.error__link {
+  width: 100%;
+  max-width: 320px;
   text-decoration: none;
-  display: inline-block;
-
-  &:hover {
-    background-color: darken($error-color, 10%);
-    transform: scale(1.05);
-  }
-
-  &.red {
-    background-color: $error-color;
-  }
 }
 </style>

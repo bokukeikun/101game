@@ -1,14 +1,16 @@
 <template>
   <div class="room-closed">
-    <h1>This room was closed</h1>
-    <router-link to="/">
-      <button class="game-button red">Back Home</button>
+    <h1>{{ t('roomClosed.title') }}</h1>
+    <router-link class="room-closed__link" to="/">
+      <button class="game-button red game-button--in-game">{{ t('common.backHome') }}</button>
     </router-link>
   </div>
 </template>
 
 <script setup lang="ts">
-// No logic needed
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 </script>
 
 <style lang="scss" scoped>
@@ -26,26 +28,9 @@
   }
 }
 
-.game-button {
-  padding: $spacing-md $spacing-lg;
-  font-size: $font-size-lg;
-  font-weight: bold;
-  border: 2px solid white;
-  border-radius: $border-radius-md;
-  background-color: $error-color;
-  color: white;
-  cursor: pointer;
-  transition: all 0.2s;
+.room-closed__link {
+  width: 100%;
+  max-width: 320px;
   text-decoration: none;
-  display: inline-block;
-
-  &:hover {
-    background-color: darken($error-color, 10%);
-    transform: scale(1.05);
-  }
-
-  &.red {
-    background-color: $error-color;
-  }
 }
 </style>

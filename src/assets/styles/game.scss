@@ -1,43 +1,50 @@
 // ゲーム固有のスタイル
 
+@mixin game-button-readable-text {
+  font-family: 'Noto Sans JP', $font-family-base, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.5;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  -webkit-font-smoothing: antialiased;
+  white-space: normal;
+  text-align: center;
+
+  &::before,
+  &::after {
+    display: none;
+  }
+}
+
+@mixin game-button-depth($shadow-color, $depth: 4px) {
+  box-shadow: 0 $depth 0 $shadow-color, 0 ($depth + 2px) 12px rgba(0, 0, 0, 0.18);
+
+  &:hover:not(:disabled) {
+    top: 2px;
+    box-shadow: 0 ($depth - 2px) 0 $shadow-color, 0 $depth 8px rgba(0, 0, 0, 0.16);
+  }
+}
+
 /* Game Buttons */
 .game-button {
+  @include game-button-readable-text;
+
   position: relative;
   top: 0;
   cursor: pointer;
   text-decoration: none !important;
   outline: none !important;
-  font-family: 'Carter One', sans-serif;
-  font-size: 14px;
-  line-height: 1.5em;
-  letter-spacing: 0.1em;
-  text-shadow: 2px 2px 1px #0066a2, -2px 2px 1px #0066a2, 2px -2px 1px #0066a2,
-    -2px -2px 1px #0066a2, 0px 2px 1px #0066a2, 0px -2px 1px #0066a2,
-    0px 4px 1px #004a87, 2px 4px 1px #004a87, -2px 4px 1px #004a87;
   border: none;
   margin: 0;
-  background: repeating-linear-gradient(
-    45deg,
-    #3ebbf7,
-    #3ebbf7 5px,
-    #45b1f4 5px,
-    #45b1f4 10px
-  );
-  border-bottom: 3px solid rgba(16, 91, 146, 0.5);
-  border-top: 3px solid rgba(255, 255, 255, 0.3);
+  min-height: 48px;
+  padding: 10px 16px;
+  font-size: 14px;
   color: #fff !important;
-  border-radius: 8px;
-  padding: 12px 24px;
-  box-shadow: 0 6px 0 #266b91, 0 8px 1px 1px rgba(0, 0, 0, 0.3),
-    0 10px 0 5px #12517d, 0 12px 0 5px #1a6b9a, 0 15px 0 5px #0c405e,
-    0 15px 1px 6px rgba(0, 0, 0, 0.3);
-
-  &:hover:not(:disabled) {
-    top: 2px;
-    box-shadow: 0 4px 0 #266b91, 0 6px 1px 1px rgba(0, 0, 0, 0.3),
-      0 8px 0 5px #12517d, 0 10px 0 5px #1a6b9a, 0 13px 0 5px #0c405e,
-      0 13px 1px 6px rgba(0, 0, 0, 0.3);
-  }
+  border-radius: 10px;
+  border-bottom: 2px solid rgba(16, 91, 146, 0.5);
+  border-top: 2px solid rgba(255, 255, 255, 0.3);
+  background: linear-gradient(180deg, #52c4f8 0%, #3ebbf7 100%);
+  @include game-button-depth(#266b91);
 
   &:disabled {
     opacity: 0.7;
@@ -45,98 +52,60 @@
     pointer-events: none;
   }
 
-  &::before {
-    content: '';
-    height: 10%;
-    position: absolute;
-    width: 40%;
-    background: #fff;
-    right: 13%;
-    top: -3%;
-    border-radius: 99px;
-  }
-
-  &::after {
-    content: '';
-    height: 10%;
-    position: absolute;
-    width: 5%;
-    background: #fff;
-    right: 5%;
-    top: -3%;
-    border-radius: 99px;
-  }
-
   &.orange {
-    background: repeating-linear-gradient(
-      45deg,
-      #ffc800,
-      #ffc800 5px,
-      #ffc200 5px,
-      #ffc200 10px
-    );
-    box-shadow: 0 6px 0 #b76113, 0 8px 1px 1px rgba(0, 0, 0, 0.3),
-      0 10px 0 5px #75421f, 0 12px 0 5px #8a542b, 0 15px 0 5px #593116,
-      0 15px 1px 6px rgba(0, 0, 0, 0.3);
-    border-bottom: 3px solid rgba(205, 102, 0, 0.5);
-    text-shadow: 2px 2px 1px #e78700, -2px 2px 1px #e78700, 2px -2px 1px #e78700,
-      -2px -2px 1px #e78700, 0px 2px 1px #e78700, 0px -2px 1px #e78700,
-      0px 4px 1px #c96100, 2px 4px 1px #c96100, -2px 4px 1px #c96100;
-
-    &:hover:not(:disabled) {
-      top: 2px;
-      box-shadow: 0 4px 0 #b76113, 0 6px 1px 1px rgba(0, 0, 0, 0.3),
-        0 8px 0 5px #75421f, 0 10px 0 5px #8a542b, 0 13px 0 5px #593116,
-        0 13px 1px 6px rgba(0, 0, 0, 0.3);
-    }
+    background: linear-gradient(180deg, #ffc233 0%, #ffb300 100%);
+    border-bottom-color: rgba(183, 97, 19, 0.85);
+    border-top-color: rgba(255, 255, 255, 0.65);
+    @include game-button-depth(#b76113);
   }
 
   &.red {
-    background: repeating-linear-gradient(
-      45deg,
-      #ff4f4c,
-      #ff4f4c 5px,
-      #ff4643 5px,
-      #ff4643 10px
-    );
-    box-shadow: 0 6px 0 #ae2725, 0 8px 1px 1px rgba(0, 0, 0, 0.3),
-      0 10px 0 5px #831614, 0 12px 0 5px #a33634, 0 15px 0 5px #631716,
-      0 15px 1px 6px rgba(0, 0, 0, 0.3);
-    border-bottom: 3px solid rgba(160, 25, 23, 0.5);
-    text-shadow: 2px 2px 1px #d72d21, -2px 2px 1px #d72d21, 2px -2px 1px #d72d21,
-      -2px -2px 1px #d72d21, 0px 2px 1px #d72d21, 0px -2px 1px #d72d21,
-      0px 4px 1px #930704, 2px 4px 1px #930704, -2px 4px 1px #930704;
-
-    &:hover:not(:disabled) {
-      top: 2px;
-      box-shadow: 0 4px 0 #ae2725, 0 6px 1px 1px rgba(0, 0, 0, 0.3),
-        0 8px 0 5px #831614, 0 10px 0 5px #a33634, 0 13px 0 5px #631716,
-        0 13px 1px 6px rgba(0, 0, 0, 0.3);
-    }
+    background: linear-gradient(180deg, #ff6b68 0%, #ff4f4c 100%);
+    border-bottom-color: rgba(160, 25, 23, 0.5);
+    @include game-button-depth(#ae2725);
   }
 
   &.green {
-    background: repeating-linear-gradient(
-      45deg,
-      #54d440,
-      #54d440 5px,
-      #52cc3f 5px,
-      #52cc3f 10px
-    );
-    box-shadow: 0 6px 0 #348628, 0 8px 1px 1px rgba(0, 0, 0, 0.3),
-      0 10px 0 5px #2a6d20, 0 12px 0 5px #39822e, 0 15px 0 5px #1d4c16,
-      0 15px 1px 6px rgba(0, 0, 0, 0.3);
-    border-bottom: 3px solid rgba(40, 117, 29, 0.5);
-    text-shadow: 2px 2px 1px #348628, -2px 2px 1px #348628, 2px -2px 1px #348628,
-      -2px -2px 1px #348628, 0px 2px 1px #348628, 0px -2px 1px #348628,
-      0px 4px 1px #1d4c16, 2px 4px 1px #1d4c16, -2px 4px 1px #1d4c16;
+    background: linear-gradient(180deg, #62e04e 0%, #54d440 100%);
+    border-bottom-color: rgba(40, 117, 29, 0.5);
+    @include game-button-depth(#348628);
+  }
 
-    &:hover:not(:disabled) {
-      top: 2px;
-      box-shadow: 0 4px 0 #348628, 0 6px 1px 1px rgba(0, 0, 0, 0.3),
-        0 8px 0 5px #2a6d20, 0 10px 0 5px #39822e, 0 13px 0 5px #1d4c16,
-        0 13px 1px 6px rgba(0, 0, 0, 0.3);
+  &.game-button--in-game {
+    width: 100%;
+  }
+
+  &.game-button--compact {
+    flex: 0 1 28%;
+    min-width: 0;
+    max-width: 30%;
+    min-height: 44px;
+    padding: 8px 8px;
+    font-size: 12px;
+    border-radius: 8px;
+    @include game-button-depth(#266b91, 3px);
+
+    &.orange {
+      @include game-button-depth(#b76113, 3px);
     }
+
+    &.red {
+      @include game-button-depth(#ae2725, 3px);
+    }
+
+    @include respond-to(md) {
+      flex: 0 1 24%;
+      max-width: 26%;
+      padding: 10px 10px;
+      font-size: 13px;
+      min-height: 46px;
+    }
+  }
+
+  @include respond-to(md) {
+    min-height: 50px;
+    padding: 12px 18px;
+    font-size: 15px;
   }
 }
 

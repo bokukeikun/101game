@@ -92,5 +92,14 @@ onMounted(() => {
   width: 100%;
   justify-content: center;
   align-items: center;
+
+  :deep(.game-button) {
+    opacity: 1;
+
+    &:disabled {
+      opacity: 1;
+      cursor: not-allowed;
+    }
+  }
 }
 </style>

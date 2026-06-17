@@ -1,7 +1,7 @@
 <template>
   <div class="waiting-list">
-    <h1 class="top-info-text">Waiting for Player</h1>
-    <div class="waiting-users" :style="{ height: waitingUsersHeight }">
+    <h1 class="waiting-list__title">{{ t('waiting.waitingForPlayer') }}</h1>
+    <div class="waiting-users">
       <WaitingListItem
         v-for="(user, i) in users"
         :key="`Item${i}`"
@@ -10,20 +10,30 @@
         :is-host="isHost"
         @open="handleOpen"
       />
+      <p v-if="users.length === 0" class="waiting-users__empty">
+        {{ t('waiting.inviteOthers') }}
+      </p>
       <Modal :open="open" @close="handleClose">
         <div class="modal-content">
-          <h2>削除しますか？</h2>
-          <button class="game-button red" @click="deleteHandler(deleteUser)">
-            Delete User
+          <h2>{{ t('waiting.confirmDelete') }}</h2>
+          <button
+            class="game-button red game-button--in-game"
+            @click="deleteHandler(deleteUser)"
+          >
+            {{ t('common.deleteUser') }}
           </button>
         </div>
       </Modal>
+    </div>
+    <div v-if="$slots.default" class="waiting-list__actions">
+      <slot />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { updateDoc, getDoc, doc } from 'firebase/firestore'
 import { getFirestoreDB } from '@/services/firebase/config'
 import WaitingListItem from '@/components/molecules/WaitingListItem.vue'
@@ -32,7 +42,6 @@ import Modal from '@/components/molecules/Modal.vue'
 interface Props {
   users: string[]
   roomCode: string
-  height?: number
   isHost?: boolean
 }
 
@@ -40,12 +49,10 @@ const props = withDefaults(defineProps<Props>(), {
   isHost: false,
 })
 
+const { t } = useI18n()
+
 const open = ref(false)
 const deleteUser = ref('')
-
-const waitingUsersHeight = computed(() => {
-  return props.height ? `${(props.height * 35) / 100}px` : '35vh'
-})
 
 const handleOpen = (user: string) => {
   deleteUser.value = user
@@ -57,6 +64,8 @@ const handleClose = () => {
 }
 
 const deleteHandler = async (userToDelete: string) => {
+  // 先にモーダルを閉じる（非同期更新の完了を待たずに UI を確定させる）
+  handleClose()
   try {
     const usersData = await getDoc(doc(getFirestoreDB(), 'users', props.roomCode))
     const newUsers =
@@ -68,7 +77,6 @@ const deleteHandler = async (userToDelete: string) => {
       restartUsers: newUsers,
       users: newUsers,
     })
-    handleClose()
   } catch (error) {
     console.error('Error deleting user:', error)
   }
@@ -80,29 +88,57 @@ const deleteHandler = async (userToDelete: string) => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: $spacing-md;
+  width: 100%;
+  max-width: 400px;
+  gap: $spacing-sm;
 }
 
-.top-info-text {
+.waiting-list__title {
+  flex-shrink: 0;
   font-family: 'Carter One', sans-serif;
-  font-size: $font-size-xl;
+  font-size: 1.1rem;
   font-weight: 1000;
   color: white;
-  margin-bottom: $spacing-md;
+  margin: 0;
+  text-align: center;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.35);
+
+  @include respond-to(md) {
+    font-size: $font-size-xl;
+  }
 }
 
 .waiting-users {
-  height: 35vh;
-  width: 95%;
-  margin: 2.5%;
+  width: 100%;
+  height: 220px;
+  flex-shrink: 0;
   overflow-y: auto;
-  background-color: #c69239;
-  border: 1px solid #063400cf;
-  border-radius: 5px;
-  box-shadow: rgb(0 0 0 / 25%) 0px 54px 55px,
-    rgb(0 0 0 / 12%) 0px -12px 30px, rgb(0 0 0 / 12%) 0px 4px 6px,
-    rgb(0 0 0 / 17%) 0px 12px 13px, rgb(0 0 0 / 9%) 0px -3px 5px;
+  -webkit-overflow-scrolling: touch;
+  background: rgba(0, 0, 0, 0.12);
+  border: 2px solid rgba(6, 52, 0, 0.45);
+  border-radius: $border-radius-lg;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.12);
   padding: $spacing-sm;
+
+  @include respond-to(md) {
+    height: 260px;
+  }
+}
+
+.waiting-list__actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $spacing-sm;
+  margin-top: $spacing-xs;
+}
+
+.waiting-users__empty {
+  margin: $spacing-md 0;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: $font-size-sm;
+  text-align: center;
 }
 
 .modal-content {
@@ -112,27 +148,6 @@ const deleteHandler = async (userToDelete: string) => {
   h2 {
     margin-bottom: $spacing-lg;
     color: white;
-  }
-}
-
-.game-button {
-  padding: $spacing-md $spacing-lg;
-  font-size: $font-size-lg;
-  font-weight: bold;
-  border: 2px solid white;
-  border-radius: $border-radius-md;
-  background-color: $error-color;
-  color: white;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    background-color: darken($error-color, 10%);
-    transform: scale(1.05);
-  }
-
-  &.red {
-    background-color: $error-color;
   }
 }
 </style>

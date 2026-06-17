@@ -1,22 +1,20 @@
 <template>
   <div class="loading">
-    <h1 style="margin: 50% 0">Now Loading....</h1>
+    <h1 style="margin: 50% 0">{{ t('loading.now') }}</h1>
   </div>
 </template>
 
 <script setup lang="ts">
-// Loading component
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 </script>
 
 <style lang="scss" scoped>
 .loading {
   @include flex-center;
   min-height: 100vh;
-  width: 100%;
-
-  h1 {
-    color: white;
-    font-size: $font-size-xl;
-  }
+  color: white;
+  text-align: center;
 }
 </style>

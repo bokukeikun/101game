@@ -1,45 +1,68 @@
 <template>
-  <div class="waiting" :style="{ height: waitingHeight }">
+  <div class="waiting">
     <WaitingList
       :users="roomStore.users"
       :room-code="roomStore.roomCode"
-      :height="height"
       :is-host="roomStore.isHost"
-    />
-    <div class="waiting__actions">
-      <p v-if="isOnlyHost" class="warning">
-        You can't start this alone <br />
-        Invite Others
-      </p>
+    >
+      <Warning
+        v-if="isOnlyHost"
+        :show="isOnlyHost"
+        :message="soloWarningMessage"
+        variant="info"
+      />
       <div v-if="roomStore.isHost" class="waiting__host-actions">
-        <button class="game-button red" @click="handleStart" :disabled="loading">
-          START
+        <div class="waiting__primary-actions">
+          <button
+            class="game-button red game-button--in-game"
+            @click="handleStart"
+            :disabled="loading"
+          >
+            {{ t('common.start') }}
+          </button>
+          <button
+            class="game-button orange game-button--in-game"
+            @click="handleCopyLink"
+          >
+            {{ t('waiting.copyInviteLink') }}
+          </button>
+        </div>
+        <button
+          class="game-button game-button--in-game"
+          @click="$emit('quitHost')"
+        >
+          {{ t('common.quit') }}
         </button>
-        <button class="game-button orange" @click="handleCopyLink">
-          Copy Invite Link
-        </button>
-        <button class="game-button" @click="$emit('quitHost')">QUIT</button>
       </div>
       <div v-else class="waiting__client-actions">
-        <h3>Please wait for the host to start</h3>
-        <p style="margin: 2% 0">or</p>
-        <button class="game-button" @click="$emit('quitClient')">QUIT</button>
+        <p class="waiting__client-message">{{ t('waiting.waitForHost') }}</p>
+        <button
+          class="game-button game-button--in-game"
+          @click="$emit('quitClient')"
+        >
+          {{ t('common.quit') }}
+        </button>
       </div>
-    </div>
+      <button type="button" class="waiting__guide-link" @click="guideOpen = true">
+        {{ t('guide.open') }}
+      </button>
+    </WaitingList>
+    <GameGuide :open="guideOpen" @close="guideOpen = false" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { doc, updateDoc } from 'firebase/firestore'
 import { getFirestoreDB } from '@/services/firebase/config'
 import { useRoomStore } from '@/stores/room'
-import { useGameStore } from '@/stores/game'
 import packOfCards from '@/utils/packOfCards'
 import shuffleArray from '@/utils/shuffleArray'
 import getRandomInt from '@/utils/getRandomInt'
 import WaitingList from '@/components/organisms/WaitingList.vue'
 import Warning from '@/components/molecules/Warning.vue'
+import GameGuide from '@/components/molecules/GameGuide.vue'
 
 defineEmits<{
   (e: 'quitHost'): void
@@ -47,18 +70,15 @@ defineEmits<{
 }>()
 
 const roomStore = useRoomStore()
-const gameStore = useGameStore()
-
-const height = computed(() => window.innerHeight)
-const waitingHeight = computed(() => {
-  return height.value ? `${(height.value * 85) / 100}px` : '85vh'
-})
-const buttonListHeight = computed(() => {
-  return height.value ? `${(height.value * 20) / 100}px` : '20vh'
-})
+const { t } = useI18n()
 
 const loading = ref(false)
 const isOnlyHost = ref(false)
+const guideOpen = ref(false)
+
+const soloWarningMessage = computed(() => {
+  return `${t('waiting.cantStartAlone')} ${t('waiting.inviteOthers')}`
+})
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -72,10 +92,8 @@ const handleStart = async () => {
 
   loading.value = true
   try {
-    // カードをシャッフル
     const shuffledCards = shuffleArray([...packOfCards])
 
-    // プレイヤーの手札を作成
     const decks: Record<string, string[]> = {}
     const users = [...roomStore.users]
     for (let i = 0; i < users.length; i++) {
@@ -83,7 +101,6 @@ const handleStart = async () => {
     }
     const drawCardPile = shuffledCards
 
-    // Firestoreにゲーム状態を保存
     await updateDoc(doc(getFirestoreDB(), 'initGameState', roomStore.roomCode), {
       turn: users[getRandomInt(0, users.length)],
       winner: users,
@@ -102,62 +119,78 @@ const handleCopyLink = async () => {
   const url = `${window.location.origin}/?roomCode=${roomStore.roomCode}`
   try {
     await navigator.clipboard.writeText(url)
-    alert('クリップボードにコピーしました！')
+    alert(t('waiting.copied'))
   } catch (error) {
     console.error('Failed to copy:', error)
-    // フォールバック: テキストエリアを使用
     const textarea = document.createElement('textarea')
     textarea.value = url
     document.body.appendChild(textarea)
     textarea.select()
     document.execCommand('copy')
     document.body.removeChild(textarea)
-    alert('クリップボードにコピーしました！')
+    alert(t('waiting.copied'))
   }
 }
-
 </script>
 
 <style lang="scss" scoped>
 .waiting {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: $spacing-lg;
+  align-items: center;
+  justify-content: flex-start;
+  padding: $spacing-sm $spacing-md;
   background-color: #c69239;
   background-size: cover;
+  background-position: center;
   background-image: url('@/assets/images/backgrounds/waitingBackgroundImg.png');
 }
 
-.waiting__actions {
-  margin: 4vh 0 0;
-  height: 20vh;
+.waiting__host-actions {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
-}
-
-.waiting__host-actions,
-.waiting__client-actions {
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-md;
-  align-items: center;
+  gap: $spacing-sm;
   width: 100%;
-  max-width: 400px;
+}
+
+.waiting__primary-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+  gap: $spacing-sm;
+  width: 100%;
 }
 
 .waiting__client-actions {
-  h3 {
-    margin: 0;
-    color: $text-primary;
-  }
-
-  p {
-    margin: $spacing-sm 0;
-    color: $text-secondary;
-  }
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $spacing-md;
+  width: 100%;
 }
 
-// ゲームボタンのスタイルはgame.scssで定義
+.waiting__client-message {
+  margin: 0;
+  font-family: 'Carter One', sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: white;
+  text-align: center;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.waiting__guide-link {
+  display: block;
+  margin: $spacing-md auto 0;
+  padding: $spacing-xs $spacing-sm;
+  border: none;
+  background: transparent;
+  color: white;
+  font-family: 'Carter One', sans-serif;
+  font-size: 0.9rem;
+  text-decoration: underline;
+  cursor: pointer;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.35);
+}
 </style>

@@ -1,7 +1,7 @@
 <template>
   <div class="play">
     <PlayerList
-      :height="height"
+      :height="playAreaHeight"
       :room-code="roomCode"
       :player-decks="gameStore.playerDecks"
       :winner="gameStore.winner"
@@ -10,9 +10,12 @@
       :restart-users="roomStore.restartUsers"
       :is-host="roomStore.isHost"
       :turn="gameStore.turn"
+      :turn-timeout="gameStore.turnTimeout"
+      :seconds-left="secondsLeft"
+      :presence-map="presenceMap"
     />
     <MiddleInfo
-      :height="height"
+      :height="playAreaHeight"
       :room-code="roomCode"
       :current-user="currentUser"
       :turn="gameStore.turn"
@@ -23,16 +26,15 @@
       :ranking="gameStore.ranking"
       :winner="gameStore.winner"
       :users="roomStore.users"
+      :draw-count="gameStore.drawCardPile.length"
+      @total-blocked="onTotalBlocked"
     />
     <div class="warning-info" :style="{ height: warningInfoHeight }">
       <Warning
-        v-if="gameStore.missPlayer"
-        :show="!!gameStore.missPlayer"
-        :message="
-          gameStore.turn === currentUser
-            ? 'Invalid Value'
-            : `${gameStore.missPlayer} Miss !`
-        "
+        v-if="gameStore.missPlayer || showTotalWarning"
+        :show="gameStore.missPlayer ? true : showTotalWarning"
+        :message="gameStore.missPlayer ? missMessage : t('play.cantCheckTotal')"
+        :variant="gameStore.missPlayer ? 'error' : 'info'"
       />
     </div>
     <div
@@ -41,14 +43,14 @@
     >
       <p
         class="player-deck-text"
-        :class="{ 'current-user': gameStore.turn === currentUser }"
+        :class="{ 'current-user': gameStore.isMyTurn }"
       >
-        {{ gameStore.turn === currentUser ? 'Your Turn !' : currentUser }}
+        {{ gameStore.isMyTurn ? t('common.yourTurn') : currentUser }}
       </p>
       <div
         class="player-deck"
         :style="{
-          pointerEvents: gameStore.turn === currentUser ? 'auto' : 'none',
+          pointerEvents: gameStore.isMyTurn ? 'auto' : 'none',
         }"
       >
         <img
@@ -65,7 +67,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { updateDoc, doc } from 'firebase/firestore'
 import { getFirestoreDB } from '@/services/firebase/config'
 import { useRoomStore } from '@/stores/room'
@@ -73,22 +76,37 @@ import { useGameStore } from '@/stores/game'
 import PlayerList from '@/components/organisms/PlayerList.vue'
 import MiddleInfo from '@/components/organisms/MiddleInfo.vue'
 import Warning from '@/components/molecules/Warning.vue'
+import { getTurnAfter } from '@/utils/turn'
+import { usePresence, type PresenceState } from '@/composables/usePresence'
 
 const roomStore = useRoomStore()
 const gameStore = useGameStore()
+const { t } = useI18n()
+const { getPresence } = usePresence()
+
+const presenceMap = computed(() => {
+  const map: Record<string, PresenceState> = {}
+  for (const user of roomStore.users) {
+    map[user] = getPresence(user)
+  }
+  return map
+})
 
 const height = computed(() => window.innerHeight)
-const currentUser = computed(() => {
-  const user = roomStore.currentUser
-  return user.startsWith('H') || user.startsWith('C') ? user.slice(1) : user
+const currentUser = computed(() => roomStore.currentPlayerName)
+
+const playAreaHeight = computed(() => {
+  return height.value ? Math.round((height.value * 90) / 100) : 0
 })
 
 const playerDeckContainerHeight = computed(() => {
-  return height.value ? `${(height.value * 30) / 100}px` : '30vh'
+  return playAreaHeight.value
+    ? `${(playAreaHeight.value * 34) / 100}px`
+    : '30vh'
 })
 
 const warningInfoHeight = computed(() => {
-  return height.value ? `${(height.value * 8) / 100}px` : '8vh'
+  return playAreaHeight.value ? `${(playAreaHeight.value * 8) / 100}px` : '8vh'
 })
 
 const playerDeck = computed(() => {
@@ -96,6 +114,92 @@ const playerDeck = computed(() => {
 })
 
 const roomCode = computed(() => roomStore.roomCode)
+
+// 手番タイムアウト（カウントダウン + 時間切れの自動パス）
+const secondsLeft = ref(0)
+let timerId: ReturnType<typeof setInterval> | null = null
+
+const clearTurnTimer = () => {
+  if (timerId) {
+    clearInterval(timerId)
+    timerId = null
+  }
+}
+
+const startTurnTimer = () => {
+  clearTurnTimer()
+  if (
+    !gameStore.turnTimeout ||
+    !gameStore.startFlag ||
+    gameStore.gameOver ||
+    !gameStore.turn
+  ) {
+    secondsLeft.value = 0
+    return
+  }
+  secondsLeft.value = gameStore.turnTimeout
+  timerId = setInterval(() => {
+    secondsLeft.value -= 1
+    if (secondsLeft.value <= 0) {
+      clearTurnTimer()
+      handleTurnTimeout()
+    }
+  }, 1000)
+}
+
+// 時間切れ時はホストのみが手番を次へ進める（AFKでも進行する）
+const handleTurnTimeout = async () => {
+  if (!roomStore.isHost) return
+  const current = gameStore.turn
+  if (!current) return
+  const nextTurn = getTurnAfter(roomStore.users, current, gameStore.isReturn)
+  try {
+    await updateDoc(doc(getFirestoreDB(), 'initGameState', roomCode.value), {
+      turn: nextTurn,
+      double: 1,
+      missPlayer: '',
+    })
+  } catch (error) {
+    console.error('Error on turn timeout:', error)
+  }
+}
+
+watch(
+  () => [
+    gameStore.turn,
+    gameStore.turnTimeout,
+    gameStore.startFlag,
+    gameStore.gameOver,
+  ],
+  startTurnTimer,
+  { immediate: true }
+)
+
+onUnmounted(clearTurnTimer)
+
+// 自分のターン中に「合計を確認」を押したときの警告表示
+const showTotalWarning = ref(false)
+let totalWarningTimer: ReturnType<typeof setTimeout> | null = null
+
+const onTotalBlocked = () => {
+  showTotalWarning.value = true
+  if (totalWarningTimer) clearTimeout(totalWarningTimer)
+  totalWarningTimer = setTimeout(() => {
+    showTotalWarning.value = false
+  }, 2000)
+}
+
+onUnmounted(() => {
+  if (totalWarningTimer) clearTimeout(totalWarningTimer)
+})
+
+const missMessage = computed(() => {
+  if (!gameStore.missPlayer) return ''
+  if (gameStore.turn === currentUser.value) {
+    return t('play.invalidValue')
+  }
+  return t('play.miss', { name: gameStore.missPlayer })
+})
 
 // カード画像の動的import
 const getCardImage = (cardName: string) => {
@@ -148,22 +252,14 @@ const onCardPlayedHandler = async (playedCard: string) => {
             updatedPlayerDeck[currentUser.value].push(drawCard)
           }
           const newDouble = gameStore.double - 1
-          const currentUserIndex = roomStore.users.indexOf(currentUser.value)
           const nextTurn = newDouble
             ? currentUser.value
-            : currentUserIndex === roomStore.users.length - 1
-              ? roomStore.users[0]
-              : roomStore.users[currentUserIndex + 1]
-          const returnNextTurn = newDouble
-            ? currentUser.value
-            : currentUserIndex === 0
-              ? roomStore.users[roomStore.users.length - 1]
-              : roomStore.users[currentUserIndex - 1]
+            : getTurnAfter(roomStore.users, currentUser.value, gameStore.isReturn)
 
           await updateDoc(
             doc(getFirestoreDB(), 'initGameState', roomCode.value),
             {
-              turn: gameStore.isReturn ? returnNextTurn : nextTurn,
+              turn: nextTurn,
               playerDecks: updatedPlayerDeck,
               currentNumber: numberOfPlayedCard,
               currentCardType: cardTypeOfPlayedCard,
@@ -207,20 +303,16 @@ const onCardPlayedHandler = async (playedCard: string) => {
         if (drawCard) {
           updatedPlayerDeck[currentUser.value].push(drawCard)
         }
-        const currentUserIndex = roomStore.users.indexOf(currentUser.value)
-        const nextTurn =
-          currentUserIndex === roomStore.users.length - 1
-            ? roomStore.users[0]
-            : roomStore.users[currentUserIndex + 1]
-        const returnNextTurn =
-          currentUserIndex === 0
-            ? roomStore.users[roomStore.users.length - 1]
-            : roomStore.users[currentUserIndex - 1]
+        const nextTurn = getTurnAfter(
+          roomStore.users,
+          currentUser.value,
+          gameStore.isReturn
+        )
 
         await updateDoc(
           doc(getFirestoreDB(), 'initGameState', roomCode.value),
           {
-            turn: gameStore.isReturn ? returnNextTurn : nextTurn,
+            turn: nextTurn,
             playerDecks: updatedPlayerDeck,
             playedCardsPile: [
               ...gameStore.playedCardsPile.slice(
@@ -253,22 +345,14 @@ const onCardPlayedHandler = async (playedCard: string) => {
           updatedPlayerDeck[currentUser.value].push(drawCard)
         }
         const newDouble = gameStore.double - 1
-        const currentUserIndex = roomStore.users.indexOf(currentUser.value)
         const nextTurn = newDouble
           ? currentUser.value
-          : currentUserIndex === roomStore.users.length - 1
-            ? roomStore.users[0]
-            : roomStore.users[currentUserIndex + 1]
-        const returnNextTurn = newDouble
-          ? currentUser.value
-          : currentUserIndex === 0
-            ? roomStore.users[roomStore.users.length - 1]
-            : roomStore.users[currentUserIndex - 1]
+          : getTurnAfter(roomStore.users, currentUser.value, gameStore.isReturn)
 
         await updateDoc(
           doc(getFirestoreDB(), 'initGameState', roomCode.value),
           {
-            turn: gameStore.isReturn ? returnNextTurn : nextTurn,
+            turn: nextTurn,
             playerDecks: updatedPlayerDeck,
             totalNumber: 101,
             playedCardsPile: [
@@ -303,20 +387,16 @@ const onCardPlayedHandler = async (playedCard: string) => {
           updatedPlayerDeck[currentUser.value].push(drawCard)
         }
         const newDouble = gameStore.double * 2
-        const currentUserIndex = roomStore.users.indexOf(currentUser.value)
-        const nextTurn =
-          currentUserIndex === roomStore.users.length - 1
-            ? roomStore.users[0]
-            : roomStore.users[currentUserIndex + 1]
-        const returnNextTurn =
-          currentUserIndex === 0
-            ? roomStore.users[roomStore.users.length - 1]
-            : roomStore.users[currentUserIndex - 1]
+        const nextTurn = getTurnAfter(
+          roomStore.users,
+          currentUser.value,
+          gameStore.isReturn
+        )
 
         await updateDoc(
           doc(getFirestoreDB(), 'initGameState', roomCode.value),
           {
-            turn: gameStore.isReturn ? returnNextTurn : nextTurn,
+            turn: nextTurn,
             playerDecks: updatedPlayerDeck,
             playedCardsPile: [
               ...gameStore.playedCardsPile.slice(
@@ -349,21 +429,17 @@ const onCardPlayedHandler = async (playedCard: string) => {
         if (drawCard) {
           updatedPlayerDeck[currentUser.value].push(drawCard)
         }
-        const currentUserIndex = roomStore.users.indexOf(currentUser.value)
-        const nextTurn =
-          currentUserIndex === roomStore.users.length - 1
-            ? roomStore.users[0]
-            : roomStore.users[currentUserIndex + 1]
-        const returnNextTurn =
-          currentUserIndex === 0
-            ? roomStore.users[roomStore.users.length - 1]
-            : roomStore.users[currentUserIndex - 1]
         const newIsReturn = !gameStore.isReturn
+        const nextTurn = getTurnAfter(
+          roomStore.users,
+          currentUser.value,
+          newIsReturn
+        )
 
         await updateDoc(
           doc(getFirestoreDB(), 'initGameState', roomCode.value),
           {
-            turn: newIsReturn ? returnNextTurn : nextTurn,
+            turn: nextTurn,
             playerDecks: updatedPlayerDeck,
             playedCardsPile: [
               ...gameStore.playedCardsPile.slice(
@@ -391,34 +467,36 @@ const onCardPlayedHandler = async (playedCard: string) => {
 
 <style lang="scss" scoped>
 .play {
-  min-height: 100vh;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .warning-info {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: $spacing-sm;
-  height: 8vh;
+  flex-shrink: 0;
+  padding: $spacing-xs $spacing-sm;
 }
 
 .player-deck-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: $spacing-md;
+  flex-shrink: 0;
+  padding: $spacing-xs $spacing-sm $spacing-sm;
   margin: 0;
-  height: 30vh;
 }
 
 .player-deck-text {
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: bold;
   color: white;
-  margin-bottom: $spacing-sm;
-  height: 6vh;
+  margin-bottom: $spacing-xs;
+  flex-shrink: 0;
 
   &.current-user {
     color: #e4ff00;
@@ -429,7 +507,8 @@ const onCardPlayedHandler = async (playedCard: string) => {
 .player-deck {
   display: flex;
   align-items: center;
-  height: 80%;
+  flex: 1;
+  min-height: 0;
   gap: $spacing-xs;
   flex-wrap: nowrap;
   justify-content: center;
@@ -439,18 +518,21 @@ const onCardPlayedHandler = async (playedCard: string) => {
 }
 
 .card {
-  width: 29%;
-  height: 100%;
-  max-height: 150px;
-  margin: 0 2%;
-  border-radius: 7px;
+  flex: 0 0 auto;
+  width: clamp(56px, 22vw, 88px);
+  height: auto;
+  max-height: 100%;
+  aspect-ratio: 5 / 7;
   cursor: pointer;
   transition: transform 350ms;
   object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
 
-  &:hover {
-    transform: scale(1.08);
-    opacity: 1;
+  @media (hover: hover) {
+    &:hover {
+      transform: scale(1.08);
+      opacity: 1;
+    }
   }
 }
 </style>

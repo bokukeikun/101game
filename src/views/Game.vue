@@ -11,11 +11,6 @@
       :height="height"
       :room-code="roomCode"
       :is-host="roomStore.isHost"
-      :current-user="currentUser"
-      :winner="gameStore.winner"
-      :is-return="gameStore.isReturn"
-      :player-decks="gameStore.playerDecks"
-      :users="roomStore.users"
       @quit-host="quitHostHandler"
     />
     <Loading v-if="gameStore.loading" />
@@ -45,10 +40,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { doc, onSnapshot, setDoc, updateDoc, deleteDoc } from 'firebase/firestore'
+import { doc, onSnapshot, setDoc } from 'firebase/firestore'
 import { getFirestoreDB } from '@/services/firebase/config'
 import { useRoomStore } from '@/stores/room'
 import { useGameStore } from '@/stores/game'
+import { useGameActions } from '@/composables/useGameActions'
 import Loading from '@/views/Loading.vue'
 import Waiting from '@/views/Waiting.vue'
 import Play from '@/views/Play.vue'
@@ -61,6 +57,7 @@ const route = useRoute()
 const router = useRouter()
 const roomStore = useRoomStore()
 const gameStore = useGameStore()
+const { endGameAsHost, leaveWaitingRoom } = useGameActions()
 
 const height = ref(window.innerHeight)
 const gameHeight = ref(height.value ? `${height.value}px` : '100vh')
@@ -127,6 +124,7 @@ onMounted(() => {
       isReturn: false,
       ranking: [],
       missPlayer: '',
+      turnTimeout: 0,
     }).catch((error) => {
       console.error('Error initializing game state:', error)
     })
@@ -176,6 +174,7 @@ onMounted(() => {
           isReturn: data.isReturn || false,
           ranking: data.ranking || [],
           missPlayer: data.missPlayer || '',
+          turnTimeout: data.turnTimeout || 0,
         })
         height.value = window.innerHeight
         gameHeight.value = `${height.value}px`
@@ -202,51 +201,20 @@ onUnmounted(() => {
 })
 
 // ホストがQuitボタンを押した時のハンドル
-const quitHostHandler = async () => {
-  gameStore.setLoading(true)
-  try {
-    await updateDoc(doc(getFirestoreDB(), 'users', roomCode.value), {
-      restartUsers: [],
-      users: [],
-    })
-    await deleteDoc(doc(getFirestoreDB(), 'initGameState', roomCode.value))
-    await deleteDoc(doc(getFirestoreDB(), 'users', roomCode.value))
-  } catch (error) {
-    console.error('Error quitting as host:', error)
-  } finally {
-    gameStore.setLoading(false)
-    roomStore.reset()
-    gameStore.reset()
-    router.push('/')
-  }
-}
+const quitHostHandler = endGameAsHost
 
 // クライアントがQuitボタンを押した時のハンドル
-const quitClientHandler = async () => {
-  gameStore.setLoading(true)
-  try {
-    const newUsers = roomStore.restartUsers.filter(
-      (user) => currentUser.value !== user
-    )
-    await updateDoc(doc(getFirestoreDB(), 'users', roomCode.value), {
-      restartUsers: newUsers,
-      users: newUsers,
-    })
-  } catch (error) {
-    console.error('Error quitting as client:', error)
-  } finally {
-    gameStore.setLoading(false)
-    router.push(`/?roomCode=${roomCode.value}`)
-  }
-}
+const quitClientHandler = leaveWaitingRoom
 </script>
 
 <style lang="scss" scoped>
 .game {
+  display: flex;
+  flex-direction: column;
   background-size: cover;
   width: 100%;
   padding: 0 1vw;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .background-img-g {
