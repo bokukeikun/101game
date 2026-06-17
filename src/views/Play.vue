@@ -27,6 +27,7 @@
       :winner="gameStore.winner"
       :users="roomStore.users"
       :draw-count="gameStore.drawCardPile.length"
+      :double="gameStore.double"
       @total-blocked="onTotalBlocked"
     />
     <div class="warning-info" :style="{ height: warningInfoHeight }">
@@ -46,6 +47,9 @@
         :class="{ 'current-user': gameStore.isMyTurn }"
       >
         {{ gameStore.isMyTurn ? t('common.yourTurn') : currentUser }}
+        <span v-if="gameStore.double > 1" class="must-play">
+          {{ t('play.mustPlay', { n: gameStore.double }) }}
+        </span>
       </p>
       <div
         class="player-deck"
@@ -251,6 +255,7 @@ const onCardPlayedHandler = async (playedCard: string) => {
           if (drawCard) {
             updatedPlayerDeck[currentUser.value].push(drawCard)
           }
+          // 数字カードはダブル義務を1枚消化。まだ残っていれば同じ人が続けて出す。
           const newDouble = gameStore.double - 1
           const nextTurn = newDouble
             ? currentUser.value
@@ -325,6 +330,8 @@ const onCardPlayedHandler = async (playedCard: string) => {
               ),
             ],
             drawCardPile: [...copiedDrawCardPileArray],
+            // パスは効果カード1枚でOK。ダブル義務はそのまま次の人へ引き継ぐ。
+            double: gameStore.double,
             missPlayer: '',
           }
         )
@@ -344,6 +351,7 @@ const onCardPlayedHandler = async (playedCard: string) => {
         if (drawCard) {
           updatedPlayerDeck[currentUser.value].push(drawCard)
         }
+        // 101 は数字カードと同じ扱い。ダブル義務を1枚消化し、残っていれば続けて出す。
         const newDouble = gameStore.double - 1
         const nextTurn = newDouble
           ? currentUser.value
@@ -386,6 +394,8 @@ const onCardPlayedHandler = async (playedCard: string) => {
         if (drawCard) {
           updatedPlayerDeck[currentUser.value].push(drawCard)
         }
+        // ダブルは効果カード1枚でOK。現在の必要枚数を2倍にして次の人へ渡す
+        // （通常時は次の人が2枚、ダブルに重ねると4枚…と倍々に増える）。
         const newDouble = gameStore.double * 2
         const nextTurn = getTurnAfter(
           roomStore.users,
@@ -453,6 +463,9 @@ const onCardPlayedHandler = async (playedCard: string) => {
             ],
             drawCardPile: [...copiedDrawCardPileArray],
             isReturn: newIsReturn,
+            // リバースは効果カード1枚でOK。向きを反転するため、ダブル義務は
+            // 反転後の次の人（＝ダブルを出した人）にそのまま返る。
+            double: gameStore.double,
             missPlayer: '',
           }
         )
@@ -502,6 +515,19 @@ const onCardPlayedHandler = async (playedCard: string) => {
     color: #e4ff00;
     font-weight: 1000;
   }
+}
+
+.must-play {
+  display: inline-block;
+  margin-left: $spacing-xs;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e23b3b;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 800;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
 }
 
 .player-deck {

@@ -64,6 +64,7 @@ export default {
     currentTurn: 'Now playing',
     deck: 'Deck',
     cardsUnit: '',
+    mustPlay: 'Play {n}',
   },
   guide: {
     open: 'How to Play',
@@ -74,10 +75,10 @@ export default {
       number: 'Add the number to the total',
       n50: 'Add +50 to the total',
       minus: 'Subtract the number from the total',
-      pass: 'Pass (skip to the next player)',
-      turn: 'Reverse the turn order',
-      double: 'Double the effect of your next card',
-      hundred: 'Set the total to 101 instantly',
+      pass: 'Pass (skip to the next player). During a double, the requirement passes on',
+      turn: 'Reverse the turn order. During a double, it bounces back to the player who played it',
+      double: 'The next player must play 2 number cards. Stacking another double increases it (4, 8, ...)',
+      hundred: 'Set the total to 101 instantly (counts as a number card)',
     },
   },
   ranking: {

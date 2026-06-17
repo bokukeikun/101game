@@ -7,7 +7,7 @@
     }"
   >
     <button
-      class="game-button game-button--compact"
+      class="game-button game-button--compact fold-button"
       :disabled="turn !== currentUser"
       @click="onFoldHandler"
     >
@@ -23,13 +23,16 @@
         :src="getCardImage(playedCardsPile[playedCardsPile.length - 1])"
         alt="card"
       />
+      <span v-if="double > 1" class="double-badge">
+        {{ t('play.mustPlay', { n: double }) }}
+      </span>
     </div>
     <span class="total-button-wrapper" @click="onTotalFlagHandler">
       <button
         class="game-button orange game-button--compact"
         :disabled="turn === currentUser"
       >
-        {{ totalFlag ? `　　${totalNumber}　　` : t('common.checkTotal') }}
+        {{ totalFlag ? totalNumber : t('common.checkTotal') }}
       </button>
     </span>
   </div>
@@ -55,10 +58,12 @@ interface Props {
   winner: string[]
   users: string[]
   drawCount?: number
+  double?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
   drawCount: 0,
+  double: 1,
 })
 
 const emit = defineEmits<{
@@ -112,6 +117,8 @@ const onFoldHandler = async () => {
       playerDecks: newPlayerDecks,
       winner: newWinner,
       ranking: [...props.ranking, props.currentUser],
+      // フォールドした人のダブル義務は次の人へ引き継がず、通常(1枚)に戻す。
+      double: 1,
       missPlayer: '',
     })
     await batch.commit()
@@ -144,9 +151,44 @@ const onTotalFlagHandler = async () => {
   padding: $spacing-xs $spacing-sm;
 }
 
+// フォールド / 合計を確認ボタンの固定幅（レスポンシブ）
+// total はクリック検知用に span で包んでいるため両者に同じサイズを適用する。
+.fold-button,
 .total-button-wrapper {
-  display: inline-flex;
-  // disabled ボタンは pointer-events:none のため、クリックは wrapper が受け取る
+  flex: 0 1 110px;
+  min-width: 0;
+  max-width: 110px;
+
+  // tablet
+  @include respond-to(sm) {
+    flex-basis: 130px;
+    max-width: 130px;
+  }
+
+  // pc
+  @include respond-to(md) {
+    flex-basis: 150px;
+    max-width: 150px;
+  }
+}
+
+.total-button-wrapper {
+  // disabled ボタンは pointer-events:none のため、クリックは wrapper が受け取る。
+  display: flex;
+  // 親 .middle-info は自分の番以外で pointer-events:none になるため、
+  // 合計確認はどちらの番でも押せるよう wrapper で auto に戻す。
+  pointer-events: auto;
+
+  .game-button {
+    // wrapper 内では compact の flex-basis(28%) を無効化し、wrapper 幅に合わせる
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: none;
+    // ラベル / 合計値をボタン中央に表示する
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
 
 .played-card-container {
@@ -193,5 +235,24 @@ const onTotalFlagHandler = async () => {
   cursor: pointer;
   object-fit: contain;
   filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45));
+}
+
+.double-badge {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #e23b3b;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  font-variant-numeric: tabular-nums;
 }
 </style>
