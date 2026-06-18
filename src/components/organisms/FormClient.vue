@@ -152,6 +152,11 @@ const handleSubmit = async () => {
   gap: $spacing-md;
   width: 100%;
   max-width: 320px;
+
+  :deep(.game-button) {
+    width: 76%;
+    max-width: 230px;
+  }
 }
 
 .form-alerts {

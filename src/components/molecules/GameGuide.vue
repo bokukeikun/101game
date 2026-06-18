@@ -1,6 +1,14 @@
 <template>
   <Modal :open="open" @close="$emit('close')">
     <div class="game-guide">
+      <button
+        type="button"
+        class="game-guide__close"
+        :aria-label="t('guide.close')"
+        @click="$emit('close')"
+      >
+        ×
+      </button>
       <h2 class="game-guide__title">{{ t('guide.title') }}</h2>
 
       <p class="game-guide__goal">{{ t('guide.goal') }}</p>
@@ -57,14 +65,43 @@ const getCardImage = (cardName: string) => {
 
 <style lang="scss" scoped>
 .game-guide {
+  position: relative;
   display: flex;
   flex-direction: column;
   max-height: 75vh;
   text-align: left;
 }
 
+.game-guide__close {
+  position: absolute;
+  top: -#{$spacing-xs};
+  right: -#{$spacing-xs};
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  @media (hover: hover) {
+    &:hover {
+      background: rgba(255, 255, 255, 0.28);
+    }
+  }
+}
+
 .game-guide__title {
   margin: 0 0 $spacing-sm;
+  padding-right: $spacing-xl;
   color: #fff;
   font-size: 1.3rem;
   text-align: center;

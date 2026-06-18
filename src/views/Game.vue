@@ -57,7 +57,7 @@ const route = useRoute()
 const router = useRouter()
 const roomStore = useRoomStore()
 const gameStore = useGameStore()
-const { endGameAsHost, leaveWaitingRoom } = useGameActions()
+const { closeRoomAsHost, leaveWaitingRoom } = useGameActions()
 
 const height = ref(window.innerHeight)
 const gameHeight = ref(height.value ? `${height.value}px` : '100vh')
@@ -124,6 +124,7 @@ onMounted(() => {
       isReturn: false,
       ranking: [],
       missPlayer: '',
+      foldedPlayer: '',
       turnTimeout: 0,
     }).catch((error) => {
       console.error('Error initializing game state:', error)
@@ -174,6 +175,7 @@ onMounted(() => {
           isReturn: data.isReturn || false,
           ranking: data.ranking || [],
           missPlayer: data.missPlayer || '',
+          foldedPlayer: data.foldedPlayer || '',
           turnTimeout: data.turnTimeout || 0,
         })
         height.value = window.innerHeight
@@ -201,7 +203,7 @@ onUnmounted(() => {
 })
 
 // ホストがQuitボタンを押した時のハンドル
-const quitHostHandler = endGameAsHost
+const quitHostHandler = closeRoomAsHost
 
 // クライアントがQuitボタンを押した時のハンドル
 const quitClientHandler = leaveWaitingRoom

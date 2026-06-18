@@ -20,10 +20,41 @@ export function useGameActions() {
     user.startsWith('H') || user.startsWith('C') ? user.slice(1) : user
 
   /**
-   * ホストがゲームを終了し、ルームを閉じる（全員終了）。
+   * ホストがゲームを終了し、待機画面へ戻す（全員の参加者は維持）。
+   */
+  async function returnToWaitingAsHost() {
+    const playedCardsPile = ['N00']
+    try {
+      await updateDoc(doc(getFirestoreDB(), 'users', roomStore.roomCode), {
+        users: [...roomStore.restartUsers],
+      })
+      await updateDoc(doc(getFirestoreDB(), 'initGameState', roomStore.roomCode), {
+        startFlag: false,
+        gameOver: false,
+        winner: [],
+        turn: '',
+        playerDecks: {},
+        currentNumber: playedCardsPile[0].slice(-2),
+        currentCardType: playedCardsPile[0].charAt(0),
+        totalNumber: 0,
+        playedCardsPile: [...playedCardsPile],
+        drawCardPile: [],
+        double: 1,
+        isReturn: false,
+        ranking: [],
+        missPlayer: '',
+        foldedPlayer: '',
+      })
+    } catch (error) {
+      console.error('Error returning to waiting:', error)
+    }
+  }
+
+  /**
+   * ホストがルームを閉じる（全員終了）。
    * 参加者・ゲーム状態のドキュメントを削除し、ホームへ戻る。
    */
-  async function endGameAsHost() {
+  async function closeRoomAsHost() {
     gameStore.setLoading(true)
     try {
       await updateDoc(doc(getFirestoreDB(), 'users', roomStore.roomCode), {
@@ -73,6 +104,7 @@ export function useGameActions() {
         playerDecks: newPlayerDecks,
         winner: newWinner,
         missPlayer: '',
+        foldedPlayer: '',
       })
     } catch (error) {
       console.error('Error leaving during play:', error)
@@ -118,7 +150,8 @@ export function useGameActions() {
   }
 
   return {
-    endGameAsHost,
+    returnToWaitingAsHost,
+    closeRoomAsHost,
     leaveDuringPlay,
     leaveWaitingRoom,
     setTurnTimeout,

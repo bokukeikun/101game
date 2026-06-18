@@ -30,10 +30,11 @@
             {{ t('common.start') }}
           </button>
           <button
-            class="game-button orange game-button--in-game"
+            class="game-button game-button--in-game"
+            :class="linkCopied ? 'green' : 'orange'"
             @click="handleCopyLink"
           >
-            {{ t('waiting.copyInviteLink') }}
+            {{ linkCopied ? t('waiting.copiedShort') : t('waiting.copyInviteLink') }}
           </button>
         </div>
         <button
@@ -45,18 +46,21 @@
       </div>
       <div v-else class="waiting__client-actions">
         <p class="waiting__client-message">{{ t('waiting.waitForHost') }}</p>
-        <button
-          class="game-button game-button--in-game"
-          @click="$emit('quitClient')"
-        >
-          {{ t('common.quit') }}
-        </button>
+        <div class="waiting__primary-actions">
+          <button
+            class="game-button game-button--in-game"
+            @click="$emit('quitClient')"
+          >
+            {{ t('common.quit') }}
+          </button>
+        </div>
       </div>
       <button type="button" class="waiting__guide-link" @click="guideOpen = true">
         {{ t('guide.open') }}
       </button>
     </WaitingList>
     <GameGuide :open="guideOpen" @close="guideOpen = false" />
+    <Toast :show="linkCopied" :message="t('waiting.copied')" />
   </div>
 </template>
 
@@ -71,6 +75,7 @@ import shuffleArray from '@/utils/shuffleArray'
 import WaitingList from '@/components/organisms/WaitingList.vue'
 import Warning from '@/components/molecules/Warning.vue'
 import GameGuide from '@/components/molecules/GameGuide.vue'
+import Toast from '@/components/molecules/Toast.vue'
 
 defineEmits<{
   (e: 'quitHost'): void
@@ -84,6 +89,9 @@ const loading = ref(false)
 const isOnlyHost = ref(false)
 const guideOpen = ref(false)
 const randomOrder = ref(false)
+const linkCopied = ref(false)
+
+let copyFeedbackTimer: ReturnType<typeof setTimeout> | null = null
 
 const soloWarningMessage = computed(() => {
   return `${t('waiting.cantStartAlone')} ${t('waiting.inviteOthers')}`
@@ -137,20 +145,32 @@ const handleStart = async () => {
   }
 }
 
+const showCopyFeedback = () => {
+  linkCopied.value = true
+  if (copyFeedbackTimer) clearTimeout(copyFeedbackTimer)
+  copyFeedbackTimer = setTimeout(() => {
+    linkCopied.value = false
+    copyFeedbackTimer = null
+  }, 2500)
+}
+
 const handleCopyLink = async () => {
   const url = `${window.location.origin}/?roomCode=${roomStore.roomCode}`
   try {
     await navigator.clipboard.writeText(url)
-    alert(t('waiting.copied'))
+    showCopyFeedback()
   } catch (error) {
     console.error('Failed to copy:', error)
     const textarea = document.createElement('textarea')
     textarea.value = url
+    textarea.setAttribute('readonly', '')
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
     document.body.appendChild(textarea)
     textarea.select()
-    document.execCommand('copy')
+    const copied = document.execCommand('copy')
     document.body.removeChild(textarea)
-    alert(t('waiting.copied'))
+    if (copied) showCopyFeedback()
   }
 }
 </script>
@@ -170,7 +190,8 @@ const handleCopyLink = async () => {
   background-image: url('@/assets/images/backgrounds/waitingBackgroundImg.png');
 }
 
-.waiting__host-actions {
+.waiting__host-actions,
+.waiting__client-actions {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -208,18 +229,6 @@ const handleCopyLink = async () => {
   height: 18px;
   accent-color: #d34a36;
   cursor: pointer;
-}
-
-.waiting__client-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: $spacing-md;
-  width: 100%;
-
-  :deep(.game-button) {
-    width: 50%;
-  }
 }
 
 .waiting__client-message {

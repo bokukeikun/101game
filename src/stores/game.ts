@@ -17,6 +17,7 @@ export interface GameState {
   isReturn: boolean
   ranking: string[]
   missPlayer: string
+  foldedPlayer: string
   turnTimeout: number
 }
 
@@ -36,6 +37,7 @@ export const useGameStore = defineStore('game', () => {
   const isReturn = ref(false)
   const ranking = ref<string[]>([])
   const missPlayer = ref('')
+  const foldedPlayer = ref('')
   const turnTimeout = ref(0)
 
   const isGameActive = computed(() => startFlag.value && !gameOver.value)
@@ -63,6 +65,7 @@ export const useGameStore = defineStore('game', () => {
     if (state.isReturn !== undefined) isReturn.value = state.isReturn
     if (state.ranking !== undefined) ranking.value = state.ranking
     if (state.missPlayer !== undefined) missPlayer.value = state.missPlayer
+    if (state.foldedPlayer !== undefined) foldedPlayer.value = state.foldedPlayer
     if (state.turnTimeout !== undefined) turnTimeout.value = state.turnTimeout
   }
 
@@ -82,6 +85,7 @@ export const useGameStore = defineStore('game', () => {
     isReturn.value = false
     ranking.value = []
     missPlayer.value = ''
+    foldedPlayer.value = ''
     turnTimeout.value = 0
   }
 
@@ -101,6 +105,7 @@ export const useGameStore = defineStore('game', () => {
     isReturn,
     ranking,
     missPlayer,
+    foldedPlayer,
     turnTimeout,
     isGameActive,
     isMyTurn,

@@ -26,23 +26,20 @@
 
     <Transition name="lang-panel">
       <div v-if="open" class="language-settings__panel" role="dialog" :aria-label="t('settings.language')">
-        <p class="language-settings__title">{{ t('settings.language') }}</p>
-        <button
-          type="button"
-          class="language-settings__option"
-          :class="{ 'language-settings__option--active': locale === 'ja' }"
-          @click="setLocale('ja')"
-        >
-          {{ t('settings.japanese') }}
-        </button>
-        <button
-          type="button"
-          class="language-settings__option"
-          :class="{ 'language-settings__option--active': locale === 'en' }"
-          @click="setLocale('en')"
-        >
-          {{ t('settings.english') }}
-        </button>
+        <div class="language-settings__field">
+          <label class="language-settings__field-label" for="locale-select">
+            {{ t('settings.language') }}
+          </label>
+          <select
+            id="locale-select"
+            class="language-settings__select"
+            :value="locale"
+            @change="onLocaleChange"
+          >
+            <option value="ja">{{ t('settings.japanese') }}</option>
+            <option value="en">{{ t('settings.english') }}</option>
+          </select>
+        </div>
 
         <hr class="language-settings__divider" />
         <button
@@ -53,7 +50,7 @@
           {{ t('guide.open') }}
         </button>
 
-        <template v-if="inGame">
+        <template v-if="showRoomSettings">
           <hr class="language-settings__divider" />
           <p class="language-settings__title">{{ t('settings.gameSection') }}</p>
 
@@ -68,13 +65,14 @@
               @change="onTimeoutChange"
             >
               <option :value="0">{{ t('settings.turnTimeoutOff') }}</option>
-              <option v-for="s in [15, 30, 45, 60]" :key="s" :value="s">
+              <option v-for="s in [5, 15, 30, 45, 60]" :key="s" :value="s">
                 {{ t('settings.seconds', { n: s }) }}
               </option>
             </select>
           </div>
 
           <button
+            v-if="gameStarted"
             type="button"
             class="language-settings__option language-settings__option--danger"
             @click="openConfirm"
@@ -120,20 +118,28 @@ const { t, locale } = useI18n()
 const route = useRoute()
 const roomStore = useRoomStore()
 const gameStore = useGameStore()
-const { endGameAsHost, leaveDuringPlay, leaveWaitingRoom, setTurnTimeout } =
+const { returnToWaitingAsHost, closeRoomAsHost, leaveDuringPlay, leaveWaitingRoom, setTurnTimeout } =
   useGameActions()
 
 const open = ref(false)
 const confirmOpen = ref(false)
 const guideOpen = ref(false)
 
-// ゲーム中（プレイ画面でルームに参加中）かどうか
-const inGame = computed(() => route.name === 'Game' && !!roomStore.roomCode)
+// ルーム内かどうか
+const inRoom = computed(() => route.name === 'Game' && !!roomStore.roomCode)
 
-const setLocale = (next: AppLocale) => {
+// ゲーム開始後（プレイ中・ランキング）
+const gameStarted = computed(() => inRoom.value && gameStore.startFlag)
+
+// 待機中のホスト設定、またはゲーム中の操作
+const showRoomSettings = computed(
+  () => inRoom.value && (roomStore.isHost || gameStarted.value)
+)
+
+const onLocaleChange = (event: Event) => {
+  const next = (event.target as HTMLSelectElement).value as AppLocale
   locale.value = next
   saveLocale(next)
-  open.value = false
 }
 
 const openConfirm = () => {
@@ -154,7 +160,7 @@ const onTimeoutChange = (event: Event) => {
 const handleConfirm = async () => {
   confirmOpen.value = false
   if (roomStore.isHost) {
-    await endGameAsHost()
+    await returnToWaitingAsHost()
   } else if (gameStore.startFlag && !gameStore.gameOver) {
     await leaveDuringPlay()
   } else {
@@ -166,7 +172,7 @@ const handleConfirm = async () => {
 <style lang="scss" scoped>
 .language-settings {
   position: fixed;
-  top: $spacing-sm;
+  top: $spacing-md;
   right: $spacing-sm;
   z-index: 1000;
 
@@ -218,7 +224,7 @@ const handleConfirm = async () => {
   position: absolute;
   top: calc(100% + $spacing-sm);
   right: 0;
-  min-width: 160px;
+  min-width: 200px;
   padding: $spacing-sm;
   background: rgba(255, 255, 255, 0.97);
   border-radius: $border-radius-md;
@@ -252,12 +258,6 @@ const handleConfirm = async () => {
     &:hover {
       background: rgba(0, 0, 0, 0.06);
     }
-  }
-
-  &--active {
-    background: rgba(25, 118, 210, 0.12);
-    color: $primary-color;
-    font-weight: bold;
   }
 
   &--danger {

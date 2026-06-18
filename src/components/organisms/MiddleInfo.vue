@@ -41,9 +41,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { writeBatch, doc } from 'firebase/firestore'
-import { getFirestoreDB } from '@/services/firebase/config'
-import { getTurnAfter } from '@/utils/turn'
+import { foldPlayer } from '@/utils/foldPlayer'
 
 interface Props {
   height?: number
@@ -93,35 +91,16 @@ const getCardImage = (cardName: string) => {
 }
 
 const onFoldHandler = async () => {
-  const newPlayerDecks: Record<string, string[]> = {}
-  for (let i = 0; i < props.users.length; i++) {
-    if (props.users[i] !== props.currentUser) {
-      newPlayerDecks[props.users[i]] = props.playerDecks[props.users[i]]
-    }
-  }
-  const newWinner = props.winner.filter((item) => item !== props.currentUser)
-  const nextTurn = getTurnAfter(props.users, props.currentUser, props.isReturn)
-
   try {
-    // users と initGameState を 1 トランザクションで同時更新する。
-    // 別々に updateDoc すると、users 更新後・initGameState 更新前の
-    // スナップショットで turn が脱落者を指したまま進行が止まる（同期不良）。
-    const db = getFirestoreDB()
-    const batch = writeBatch(db)
-    batch.update(doc(db, 'users', props.roomCode), {
-      users: newWinner,
+    await foldPlayer({
+      roomCode: props.roomCode,
+      foldedUser: props.currentUser,
+      users: props.users,
+      winner: props.winner,
+      ranking: props.ranking,
+      playerDecks: props.playerDecks,
+      isReturn: props.isReturn,
     })
-    batch.update(doc(db, 'initGameState', props.roomCode), {
-      gameOver: newWinner.length === 1,
-      turn: nextTurn,
-      playerDecks: newPlayerDecks,
-      winner: newWinner,
-      ranking: [...props.ranking, props.currentUser],
-      // フォールドした人のダブル義務は次の人へ引き継がず、通常(1枚)に戻す。
-      double: 1,
-      missPlayer: '',
-    })
-    await batch.commit()
   } catch (error) {
     console.error('Error on fold:', error)
   }

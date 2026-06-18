@@ -28,8 +28,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { updateDoc, doc } from 'firebase/firestore'
-import { getFirestoreDB } from '@/services/firebase/config'
 import { useRoomStore } from '@/stores/room'
 import { useGameStore } from '@/stores/game'
 import { useGameActions } from '@/composables/useGameActions'
@@ -38,40 +36,14 @@ import Confetti from '@/components/atoms/Confetti.vue'
 
 const roomStore = useRoomStore()
 const gameStore = useGameStore()
-const { endGameAsHost } = useGameActions()
+const { returnToWaitingAsHost, closeRoomAsHost } = useGameActions()
 const { t } = useI18n()
 
 const height = computed(() => window.innerHeight)
 
-const restartHandler = async () => {
-  const playedCardsPile = ['N00']
+const restartHandler = returnToWaitingAsHost
 
-  await updateDoc(doc(getFirestoreDB(), 'users', roomStore.roomCode), {
-    users: [...roomStore.restartUsers],
-  })
-
-  await updateDoc(
-    doc(getFirestoreDB(), 'initGameState', roomStore.roomCode),
-    {
-      startFlag: false,
-      gameOver: false,
-      winner: [],
-      turn: '',
-      playerDecks: {},
-      currentNumber: playedCardsPile[0].slice(-2),
-      currentCardType: playedCardsPile[0].charAt(0),
-      totalNumber: 0,
-      playedCardsPile: [...playedCardsPile],
-      drawCardPile: [],
-      double: 1,
-      isReturn: false,
-      ranking: [],
-      missPlayer: '',
-    }
-  )
-}
-
-const quitHostHandler = endGameAsHost
+const quitHostHandler = closeRoomAsHost
 </script>
 
 <style lang="scss" scoped>

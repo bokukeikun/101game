@@ -32,10 +32,10 @@
     />
     <div class="warning-info" :style="{ height: warningInfoHeight }">
       <Warning
-        v-if="gameStore.missPlayer || showTotalWarning"
-        :show="gameStore.missPlayer ? true : showTotalWarning"
-        :message="gameStore.missPlayer ? missMessage : t('play.cantCheckTotal')"
-        :variant="gameStore.missPlayer ? 'error' : 'info'"
+        v-if="showMissWarning || showTotalWarning"
+        :show="showMissWarning || showTotalWarning"
+        :message="showMissWarning ? missMessage : t('play.cantCheckTotal')"
+        :variant="showMissWarning ? 'error' : 'info'"
       />
     </div>
     <div
@@ -67,6 +67,7 @@
         />
       </div>
     </div>
+    <Toast :show="showFoldToast" :message="foldToastMessage" />
   </div>
 </template>
 
@@ -80,7 +81,9 @@ import { useGameStore } from '@/stores/game'
 import PlayerList from '@/components/organisms/PlayerList.vue'
 import MiddleInfo from '@/components/organisms/MiddleInfo.vue'
 import Warning from '@/components/molecules/Warning.vue'
+import Toast from '@/components/molecules/Toast.vue'
 import { getTurnAfter } from '@/utils/turn'
+import { foldPlayer } from '@/utils/foldPlayer'
 import { usePresence, type PresenceState } from '@/composables/usePresence'
 
 const roomStore = useRoomStore()
@@ -119,7 +122,7 @@ const playerDeck = computed(() => {
 
 const roomCode = computed(() => roomStore.roomCode)
 
-// 手番タイムアウト（カウントダウン + 時間切れの自動パス）
+// 手番タイムアウト（カウントダウン + 時間切れでフォールド）
 const secondsLeft = ref(0)
 let timerId: ReturnType<typeof setInterval> | null = null
 
@@ -151,20 +154,24 @@ const startTurnTimer = () => {
   }, 1000)
 }
 
-// 時間切れ時はホストのみが手番を次へ進める（AFKでも進行する）
+// 時間切れ時はホストのみがタイムアウトした人をフォールドさせる（AFKでも進行する）
 const handleTurnTimeout = async () => {
   if (!roomStore.isHost) return
-  const current = gameStore.turn
-  if (!current) return
-  const nextTurn = getTurnAfter(roomStore.users, current, gameStore.isReturn)
+  const timedOutPlayer = gameStore.turn
+  if (!timedOutPlayer) return
+  if (!roomStore.users.includes(timedOutPlayer)) return
   try {
-    await updateDoc(doc(getFirestoreDB(), 'initGameState', roomCode.value), {
-      turn: nextTurn,
-      double: 1,
-      missPlayer: '',
+    await foldPlayer({
+      roomCode: roomCode.value,
+      foldedUser: timedOutPlayer,
+      users: roomStore.users,
+      winner: gameStore.winner,
+      ranking: gameStore.ranking,
+      playerDecks: gameStore.playerDecks,
+      isReturn: gameStore.isReturn,
     })
   } catch (error) {
-    console.error('Error on turn timeout:', error)
+    console.error('Error on turn timeout fold:', error)
   }
 }
 
@@ -193,14 +200,78 @@ const onTotalBlocked = () => {
   }, 2000)
 }
 
+const showFoldToast = ref(false)
+const foldToastMessage = ref('')
+let foldToastTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(
+  () => gameStore.foldedPlayer,
+  (newVal, oldVal) => {
+    if (newVal && newVal !== oldVal) {
+      foldToastMessage.value = t('play.folded', {
+        name: newVal,
+        n: gameStore.winner.length,
+      })
+      showFoldToast.value = true
+      if (foldToastTimer) clearTimeout(foldToastTimer)
+      foldToastTimer = setTimeout(() => {
+        showFoldToast.value = false
+      }, 2500)
+    }
+  }
+)
+
 onUnmounted(() => {
   if (totalWarningTimer) clearTimeout(totalWarningTimer)
+  if (foldToastTimer) clearTimeout(foldToastTimer)
+  clearMissWarningTimer()
 })
+
+const showMissWarning = ref(false)
+let missWarningTimer: ReturnType<typeof setTimeout> | null = null
+
+const clearMissWarningTimer = () => {
+  if (missWarningTimer) {
+    clearTimeout(missWarningTimer)
+    missWarningTimer = null
+  }
+}
+
+const displayMissWarning = () => {
+  clearMissWarningTimer()
+  showMissWarning.value = true
+  missWarningTimer = setTimeout(async () => {
+    showMissWarning.value = false
+    missWarningTimer = null
+    // 同じミスを繰り返しても watch が再発火するようクリアする
+    if (gameStore.missPlayer) {
+      try {
+        await updateDoc(doc(getFirestoreDB(), 'initGameState', roomCode.value), {
+          missPlayer: '',
+        })
+      } catch (error) {
+        console.error('Error clearing miss player:', error)
+      }
+    }
+  }, 2500)
+}
+
+watch(
+  () => gameStore.missPlayer,
+  (newVal) => {
+    if (newVal) {
+      displayMissWarning()
+    } else {
+      clearMissWarningTimer()
+      showMissWarning.value = false
+    }
+  }
+)
 
 const missMessage = computed(() => {
   if (!gameStore.missPlayer) return ''
   if (gameStore.turn === currentUser.value) {
-    return t('play.invalidValue')
+    return t('play.invalidValue', { total: gameStore.totalNumber })
   }
   return t('play.miss', { name: gameStore.missPlayer })
 })
@@ -282,6 +353,7 @@ const onCardPlayedHandler = async (playedCard: string) => {
               drawCardPile: [...copiedDrawCardPileArray],
               double: newDouble ? newDouble : 1,
               missPlayer: '',
+              foldedPlayer: '',
             }
           )
         }
@@ -290,8 +362,11 @@ const onCardPlayedHandler = async (playedCard: string) => {
           doc(getFirestoreDB(), 'initGameState', roomCode.value),
           {
             missPlayer: currentUser.value,
+            foldedPlayer: '',
           }
         )
+        // missPlayer が同値のとき watch が動かないため、毎回ここでも表示する
+        displayMissWarning()
       }
       break
     }
@@ -333,6 +408,7 @@ const onCardPlayedHandler = async (playedCard: string) => {
             // パスは効果カード1枚でOK。ダブル義務はそのまま次の人へ引き継ぐ。
             double: gameStore.double,
             missPlayer: '',
+            foldedPlayer: '',
           }
         )
       }
@@ -376,6 +452,7 @@ const onCardPlayedHandler = async (playedCard: string) => {
             drawCardPile: [...copiedDrawCardPileArray],
             double: newDouble ? newDouble : 1,
             missPlayer: '',
+            foldedPlayer: '',
           }
         )
       }
@@ -421,6 +498,7 @@ const onCardPlayedHandler = async (playedCard: string) => {
             drawCardPile: [...copiedDrawCardPileArray],
             double: newDouble,
             missPlayer: '',
+            foldedPlayer: '',
           }
         )
       }
@@ -467,6 +545,7 @@ const onCardPlayedHandler = async (playedCard: string) => {
             // 反転後の次の人（＝ダブルを出した人）にそのまま返る。
             double: gameStore.double,
             missPlayer: '',
+            foldedPlayer: '',
           }
         )
       }
