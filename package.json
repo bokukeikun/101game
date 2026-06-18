@@ -18,7 +18,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "build:prod": "vite build --mode production",
-    "deploy": "yarn build:prod && firebase deploy",
+    "deploy": "yarn build:prod && firebase deploy --only hosting,firestore",
     "deploy:hosting": "yarn build:prod && firebase deploy --only hosting",
     "deploy:functions": "firebase deploy --only functions",
     "deploy:firestore": "firebase deploy --only firestore"

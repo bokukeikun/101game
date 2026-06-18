@@ -226,7 +226,7 @@ export const startGame = functions.https.onCall(async (data, context) => {
  */
 export const cleanupRooms = functions.pubsub
   .schedule('every 1 hours')
-  .onRun(async (context) => {
+  .onRun(async () => {
     try {
       const oneDayAgo = new Date()
       oneDayAgo.setHours(oneDayAgo.getHours() - 24)
