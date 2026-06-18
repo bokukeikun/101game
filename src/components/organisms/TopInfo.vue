@@ -94,7 +94,6 @@ const quitHostHandler = () => {
 }
 
 .top-info-img {
-  width: 48px;
   height: 48px;
   cursor: pointer;
   transition: transform 0.2s;
