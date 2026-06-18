@@ -2,45 +2,25 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Rooms コレクション
-    match /rooms/{roomId} {
-      // 読み取り: 誰でも可能（ルームコードでアクセス）
-      allow read: if true;
-      
-      // 作成: 認証済みユーザーのみ
-      allow create: if request.auth != null 
-        && request.resource.data.hostId == request.auth.uid
-        && request.resource.data.code.size() == 5;
-      
-      // 更新: ホストのみ、または自分のプレイヤー情報のみ
-      allow update: if request.auth != null 
-        && (resource.data.hostId == request.auth.uid
-            || request.resource.data.diff(resource.data).affectedKeys()
-                .hasOnly(['players']));
-      
-      // 削除: ホストのみ
-      allow delete: if request.auth != null 
-        && resource.data.hostId == request.auth.uid;
-      
-      // Players サブコレクション
-      match /players/{playerId} {
-        allow read: if true;
-        allow create: if request.auth != null 
-          && request.resource.data.id == request.auth.uid;
-        allow update: if request.auth != null 
-          && (resource.data.id == request.auth.uid
-              || get(/databases/$(database)/documents/rooms/$(roomId)).data.hostId == request.auth.uid);
-        allow delete: if request.auth != null 
-          && (resource.data.id == request.auth.uid
-              || get(/databases/$(database)/documents/rooms/$(roomId)).data.hostId == request.auth.uid);
-      }
+    // 101ゲームが実際に使うコレクション（Firebase Auth なし・ルームコード単位）
+    // 部屋コードは5文字の英数字（randomCodeGenerator と同じ）
+    function isValidRoomCode(roomCode) {
+      return roomCode.matches('^[A-Za-z0-9]{5}$');
     }
-    
-    // Games コレクション（ゲーム履歴）
-    match /games/{gameId} {
-      allow read: if true;
-      allow create: if request.auth != null;
-      allow update, delete: if false; // ゲーム履歴は不変
+
+    // 参加者リスト（users / restartUsers）
+    match /users/{roomCode} {
+      allow read, write: if isValidRoomCode(roomCode);
+    }
+
+    // ゲーム状態（手番・山札・合計など）
+    match /initGameState/{roomCode} {
+      allow read, write: if isValidRoomCode(roomCode);
+    }
+
+    // オンライン状態（ハートビート）
+    match /presence/{roomCode} {
+      allow read, write: if isValidRoomCode(roomCode);
     }
   }
 }
