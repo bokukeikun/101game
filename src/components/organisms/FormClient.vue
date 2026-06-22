@@ -31,8 +31,9 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { doc, getDoc, updateDoc } from 'firebase/firestore'
+import { doc, getDoc } from 'firebase/firestore'
 import { getFirestoreDB } from '@/services/firebase/config'
+import { patchUsersDoc } from '@/services/firebase/roomLifecycle'
 import { useRoomStore } from '@/stores/room'
 import { useNameInput, MAX_NAME_LENGTH } from '@/composables/useNameInput'
 import Spinner from '@/components/atoms/Spinner.vue'
@@ -106,7 +107,7 @@ const handleSubmit = async () => {
         isRoomFull.value = val
       })
     } else {
-      await updateDoc(doc(db, 'users', props.roomCode), {
+      await patchUsersDoc(props.roomCode, {
         restartUsers: [...restartUsers, name.value],
         users: [...users, name.value],
       })

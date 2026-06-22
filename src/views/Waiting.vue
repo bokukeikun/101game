@@ -69,6 +69,7 @@ import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { doc, writeBatch } from 'firebase/firestore'
 import { getFirestoreDB } from '@/services/firebase/config'
+import { batchUpdateWithActivity } from '@/services/firebase/roomLifecycle'
 import { useRoomStore } from '@/stores/room'
 import packOfCards from '@/utils/packOfCards'
 import shuffleArray from '@/utils/shuffleArray'
@@ -126,17 +127,17 @@ const handleStart = async () => {
     const db = getFirestoreDB()
     const batch = writeBatch(db)
     // 手番進行は users の並び順に依存するため、開始順を users にも反映する。
-    batch.update(doc(db, 'users', roomStore.roomCode), {
+    batch.update(doc(db, 'users', roomStore.roomCode), batchUpdateWithActivity({
       users: orderedUsers,
-    })
-    batch.update(doc(db, 'initGameState', roomStore.roomCode), {
+    }))
+    batch.update(doc(db, 'initGameState', roomStore.roomCode), batchUpdateWithActivity({
       // 先頭のプレイヤーから開始する。
       turn: orderedUsers[0],
       winner: orderedUsers,
       startFlag: true,
       playerDecks: decks,
       drawCardPile: [...drawCardPile],
-    })
+    }))
     await batch.commit()
   } catch (error) {
     console.error('Error starting game:', error)

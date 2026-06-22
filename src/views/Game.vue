@@ -40,8 +40,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { doc, onSnapshot, setDoc } from 'firebase/firestore'
+import { doc, onSnapshot } from 'firebase/firestore'
 import { getFirestoreDB } from '@/services/firebase/config'
+import { ensureInitGameStateDoc } from '@/services/firebase/roomLifecycle'
 import { useRoomStore } from '@/stores/room'
 import { useGameStore } from '@/stores/game'
 import { useGameActions } from '@/composables/useGameActions'
@@ -106,28 +107,10 @@ onMounted(() => {
   }
   window.addEventListener('beforeunload', handleBeforeUnload)
 
-  // ホストの場合のみinitGameStateを初期化
+  // ホスト: ドキュメントが無い場合のみ初期化（リロード時は既存状態を保持）
   if (roomStore.isHost) {
-    const playedCardsPile = ['N00']
-    setDoc(doc(getFirestoreDB(), 'initGameState', roomCodeParam), {
-      startFlag: false,
-      gameOver: false,
-      winner: [],
-      turn: '',
-      playerDecks: {},
-      currentNumber: playedCardsPile[0].slice(-2),
-      currentCardType: playedCardsPile[0].charAt(0),
-      totalNumber: 0,
-      playedCardsPile: [...playedCardsPile],
-      drawCardPile: [],
-      double: 1,
-      isReturn: false,
-      ranking: [],
-      missPlayer: '',
-      foldedPlayer: '',
-      turnTimeout: 0,
-    }).catch((error) => {
-      console.error('Error initializing game state:', error)
+    ensureInitGameStateDoc(roomCodeParam).catch((error) => {
+      console.error('Error ensuring game state:', error)
     })
   }
 

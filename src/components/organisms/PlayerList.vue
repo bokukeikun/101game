@@ -39,6 +39,10 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { writeBatch, getDoc, doc } from 'firebase/firestore'
 import { getFirestoreDB } from '@/services/firebase/config'
+import {
+  batchUpdateWithActivity,
+  deleteRoomData,
+} from '@/services/firebase/roomLifecycle'
 import PlayerListItem from '@/components/molecules/PlayerListItem.vue'
 import Modal from '@/components/molecules/Modal.vue'
 import { getTurnAfter } from '@/utils/turn'
@@ -129,17 +133,22 @@ const deleteHandler = async (userToDelete: string) => {
       .data()
       ?.restartUsers.filter((user: string) => userToDelete !== user) || []
 
+    if (newUsers.length === 0) {
+      await deleteRoomData(props.roomCode)
+      return
+    }
+
     const batch = writeBatch(db)
-    batch.update(doc(db, 'users', props.roomCode), {
+    batch.update(doc(db, 'users', props.roomCode), batchUpdateWithActivity({
       restartUsers: newUsers,
       users: newUsers,
-    })
-    batch.update(doc(db, 'initGameState', props.roomCode), {
+    }))
+    batch.update(doc(db, 'initGameState', props.roomCode), batchUpdateWithActivity({
       gameOver: newWinner.length === 1,
       winner: newWinner,
       turn: nextTurn,
       playerDecks: newPlayerDecks,
-    })
+    }))
     await batch.commit()
   } catch (error) {
     console.error('Error deleting user:', error)

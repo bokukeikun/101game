@@ -221,32 +221,46 @@ export const startGame = functions.https.onCall(async (data, context) => {
   }
 })
 
+const ROOM_TTL_HOURS = 24
+
+/** ルームコードに紐づく全ドキュメントを削除 */
+async function deleteRoomByCode(roomCode: string): Promise<void> {
+  const batch = db.batch()
+  batch.delete(db.collection('users').doc(roomCode))
+  batch.delete(db.collection('initGameState').doc(roomCode))
+  batch.delete(db.collection('presence').doc(roomCode))
+  await batch.commit()
+}
+
 /**
- * 古いルームをクリーンアップする（スケジュール実行）
+ * 24時間以上更新のないルームをクリーンアップする（スケジュール実行）
  */
-export const cleanupRooms = functions.pubsub
+export const cleanupStaleRooms = functions.pubsub
   .schedule('every 1 hours')
   .onRun(async () => {
     try {
-      const oneDayAgo = new Date()
-      oneDayAgo.setHours(oneDayAgo.getHours() - 24)
+      const cutoffDate = new Date()
+      cutoffDate.setHours(cutoffDate.getHours() - ROOM_TTL_HOURS)
+      const cutoff = admin.firestore.Timestamp.fromDate(cutoffDate)
 
-      const oldRoomsSnapshot = await db
-        .collection('rooms')
-        .where('updatedAt', '<', admin.firestore.Timestamp.fromDate(oneDayAgo))
-        .get()
+      const staleCodes = new Set<string>()
 
-      const batch = db.batch()
-      oldRoomsSnapshot.docs.forEach((doc) => {
-        batch.delete(doc.ref)
-      })
+      const [staleUsers, staleGameState] = await Promise.all([
+        db.collection('users').where('lastActivityAt', '<', cutoff).get(),
+        db.collection('initGameState').where('lastActivityAt', '<', cutoff).get(),
+      ])
 
-      await batch.commit()
+      staleUsers.docs.forEach((docSnap) => staleCodes.add(docSnap.id))
+      staleGameState.docs.forEach((docSnap) => staleCodes.add(docSnap.id))
 
-      console.log(`Cleaned up ${oldRoomsSnapshot.size} old rooms`)
+      for (const roomCode of staleCodes) {
+        await deleteRoomByCode(roomCode)
+      }
+
+      console.log(`Cleaned up ${staleCodes.size} stale rooms`)
       return null
     } catch (error) {
-      console.error('Error cleaning up rooms:', error)
+      console.error('Error cleaning up stale rooms:', error)
       return null
     }
   })

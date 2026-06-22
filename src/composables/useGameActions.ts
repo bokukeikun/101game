@@ -1,6 +1,10 @@
 import { useRouter } from 'vue-router'
-import { updateDoc, deleteDoc, doc } from 'firebase/firestore'
-import { getFirestoreDB } from '@/services/firebase/config'
+import {
+  deleteRoomData,
+  patchUsersDoc,
+  saveUsersOrDeleteRoom,
+  updateInitGameStateDoc,
+} from '@/services/firebase/roomLifecycle'
 import { useRoomStore } from '@/stores/room'
 import { useGameStore } from '@/stores/game'
 import { getTurnAfter } from '@/utils/turn'
@@ -25,10 +29,10 @@ export function useGameActions() {
   async function returnToWaitingAsHost() {
     const playedCardsPile = ['N00']
     try {
-      await updateDoc(doc(getFirestoreDB(), 'users', roomStore.roomCode), {
+      await patchUsersDoc(roomStore.roomCode, {
         users: [...roomStore.restartUsers],
       })
-      await updateDoc(doc(getFirestoreDB(), 'initGameState', roomStore.roomCode), {
+      await updateInitGameStateDoc(roomStore.roomCode, {
         startFlag: false,
         gameOver: false,
         winner: [],
@@ -57,12 +61,7 @@ export function useGameActions() {
   async function closeRoomAsHost() {
     gameStore.setLoading(true)
     try {
-      await updateDoc(doc(getFirestoreDB(), 'users', roomStore.roomCode), {
-        restartUsers: [],
-        users: [],
-      })
-      await deleteDoc(doc(getFirestoreDB(), 'initGameState', roomStore.roomCode))
-      await deleteDoc(doc(getFirestoreDB(), 'users', roomStore.roomCode))
+      await deleteRoomData(roomStore.roomCode)
     } catch (error) {
       console.error('Error ending game as host:', error)
     } finally {
@@ -94,11 +93,12 @@ export function useGameActions() {
     )
 
     try {
-      await updateDoc(doc(getFirestoreDB(), 'users', roomStore.roomCode), {
-        restartUsers: newWinner,
-        users: newWinner,
-      })
-      await updateDoc(doc(getFirestoreDB(), 'initGameState', roomStore.roomCode), {
+      if (newWinner.length === 0) {
+        await deleteRoomData(roomStore.roomCode)
+        return
+      }
+      await saveUsersOrDeleteRoom(roomStore.roomCode, newWinner, newWinner)
+      await updateInitGameStateDoc(roomStore.roomCode, {
         gameOver: newWinner.length === 1,
         turn: nextTurn,
         playerDecks: newPlayerDecks,
@@ -122,10 +122,7 @@ export function useGameActions() {
       const newUsers = roomStore.restartUsers.filter(
         (user) => user !== currentUser
       )
-      await updateDoc(doc(getFirestoreDB(), 'users', roomStore.roomCode), {
-        restartUsers: newUsers,
-        users: newUsers,
-      })
+      await saveUsersOrDeleteRoom(roomStore.roomCode, newUsers, newUsers)
     } catch (error) {
       console.error('Error leaving waiting room:', error)
     } finally {
@@ -141,7 +138,7 @@ export function useGameActions() {
   async function setTurnTimeout(seconds: number) {
     const clamped = Math.max(0, Math.min(60, Math.round(seconds)))
     try {
-      await updateDoc(doc(getFirestoreDB(), 'initGameState', roomStore.roomCode), {
+      await updateInitGameStateDoc(roomStore.roomCode, {
         turnTimeout: clamped,
       })
     } catch (error) {

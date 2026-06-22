@@ -74,8 +74,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { updateDoc, doc } from 'firebase/firestore'
-import { getFirestoreDB } from '@/services/firebase/config'
+import { updateInitGameStateDoc } from '@/services/firebase/roomLifecycle'
 import { useRoomStore } from '@/stores/room'
 import { useGameStore } from '@/stores/game'
 import PlayerList from '@/components/organisms/PlayerList.vue'
@@ -246,7 +245,7 @@ const displayMissWarning = () => {
     // 同じミスを繰り返しても watch が再発火するようクリアする
     if (gameStore.missPlayer) {
       try {
-        await updateDoc(doc(getFirestoreDB(), 'initGameState', roomCode.value), {
+        await updateInitGameStateDoc(roomCode.value, {
           missPlayer: '',
         })
       } catch (error) {
@@ -332,9 +331,7 @@ const onCardPlayedHandler = async (playedCard: string) => {
             ? currentUser.value
             : getTurnAfter(roomStore.users, currentUser.value, gameStore.isReturn)
 
-          await updateDoc(
-            doc(getFirestoreDB(), 'initGameState', roomCode.value),
-            {
+          await updateInitGameStateDoc(roomCode.value, {
               turn: nextTurn,
               playerDecks: updatedPlayerDeck,
               currentNumber: numberOfPlayedCard,
@@ -354,17 +351,13 @@ const onCardPlayedHandler = async (playedCard: string) => {
               double: newDouble ? newDouble : 1,
               missPlayer: '',
               foldedPlayer: '',
-            }
-          )
+          })
         }
       } else {
-        await updateDoc(
-          doc(getFirestoreDB(), 'initGameState', roomCode.value),
-          {
+        await updateInitGameStateDoc(roomCode.value, {
             missPlayer: currentUser.value,
             foldedPlayer: '',
-          }
-        )
+        })
         // missPlayer が同値のとき watch が動かないため、毎回ここでも表示する
         displayMissWarning()
       }
@@ -389,9 +382,7 @@ const onCardPlayedHandler = async (playedCard: string) => {
           gameStore.isReturn
         )
 
-        await updateDoc(
-          doc(getFirestoreDB(), 'initGameState', roomCode.value),
-          {
+        await updateInitGameStateDoc(roomCode.value, {
             turn: nextTurn,
             playerDecks: updatedPlayerDeck,
             playedCardsPile: [
@@ -409,8 +400,7 @@ const onCardPlayedHandler = async (playedCard: string) => {
             double: gameStore.double,
             missPlayer: '',
             foldedPlayer: '',
-          }
-        )
+        })
       }
       break
     }
@@ -433,9 +423,7 @@ const onCardPlayedHandler = async (playedCard: string) => {
           ? currentUser.value
           : getTurnAfter(roomStore.users, currentUser.value, gameStore.isReturn)
 
-        await updateDoc(
-          doc(getFirestoreDB(), 'initGameState', roomCode.value),
-          {
+        await updateInitGameStateDoc(roomCode.value, {
             turn: nextTurn,
             playerDecks: updatedPlayerDeck,
             totalNumber: 101,
@@ -453,8 +441,7 @@ const onCardPlayedHandler = async (playedCard: string) => {
             double: newDouble ? newDouble : 1,
             missPlayer: '',
             foldedPlayer: '',
-          }
-        )
+        })
       }
       break
     }
@@ -480,9 +467,7 @@ const onCardPlayedHandler = async (playedCard: string) => {
           gameStore.isReturn
         )
 
-        await updateDoc(
-          doc(getFirestoreDB(), 'initGameState', roomCode.value),
-          {
+        await updateInitGameStateDoc(roomCode.value, {
             turn: nextTurn,
             playerDecks: updatedPlayerDeck,
             playedCardsPile: [
@@ -499,8 +484,7 @@ const onCardPlayedHandler = async (playedCard: string) => {
             double: newDouble,
             missPlayer: '',
             foldedPlayer: '',
-          }
-        )
+        })
       }
       break
     }
@@ -524,9 +508,7 @@ const onCardPlayedHandler = async (playedCard: string) => {
           newIsReturn
         )
 
-        await updateDoc(
-          doc(getFirestoreDB(), 'initGameState', roomCode.value),
-          {
+        await updateInitGameStateDoc(roomCode.value, {
             turn: nextTurn,
             playerDecks: updatedPlayerDeck,
             playedCardsPile: [
@@ -546,8 +528,7 @@ const onCardPlayedHandler = async (playedCard: string) => {
             double: gameStore.double,
             missPlayer: '',
             foldedPlayer: '',
-          }
-        )
+        })
       }
       break
     }

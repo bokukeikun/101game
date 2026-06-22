@@ -28,8 +28,11 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { doc, setDoc } from 'firebase/firestore'
-import { getFirestoreDB } from '@/services/firebase/config'
+import {
+  getDefaultInitGameState,
+  setInitGameStateDoc,
+  setUsersDoc,
+} from '@/services/firebase/roomLifecycle'
 import { useRoomStore } from '@/stores/room'
 import { useNameInput, MAX_NAME_LENGTH } from '@/composables/useNameInput'
 import Spinner from '@/components/atoms/Spinner.vue'
@@ -60,11 +63,11 @@ const handleSubmit = async () => {
   loading.value = true
   errorMessage.value = ''
   try {
-    const db = getFirestoreDB()
-    await setDoc(doc(db, 'users', props.roomCode), {
+    await setUsersDoc(props.roomCode, {
       restartUsers: [name.value],
       users: [name.value],
     })
+    await setInitGameStateDoc(props.roomCode, getDefaultInitGameState())
     roomStore.setCurrentUser(`H${name.value}`)
     router.replace(`/play?roomCode=${props.roomCode}&currentUser=H${name.value}`)
   } catch (error: any) {

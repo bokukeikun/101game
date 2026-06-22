@@ -1,5 +1,9 @@
 import { writeBatch, doc } from 'firebase/firestore'
 import { getFirestoreDB } from '@/services/firebase/config'
+import {
+  batchUpdateWithActivity,
+  deleteRoomData,
+} from '@/services/firebase/roomLifecycle'
 import { getTurnAfter } from '@/utils/turn'
 
 export interface FoldPlayerParams {
@@ -28,12 +32,17 @@ export async function foldPlayer(params: FoldPlayerParams) {
   const newWinner = winner.filter((item) => item !== foldedUser)
   const nextTurn = getTurnAfter(users, foldedUser, isReturn)
 
+  if (newWinner.length === 0) {
+    await deleteRoomData(roomCode)
+    return
+  }
+
   const db = getFirestoreDB()
   const batch = writeBatch(db)
-  batch.update(doc(db, 'users', roomCode), {
+  batch.update(doc(db, 'users', roomCode), batchUpdateWithActivity({
     users: newWinner,
-  })
-  batch.update(doc(db, 'initGameState', roomCode), {
+  }))
+  batch.update(doc(db, 'initGameState', roomCode), batchUpdateWithActivity({
     gameOver: newWinner.length === 1,
     turn: nextTurn,
     playerDecks: newPlayerDecks,
@@ -42,6 +51,6 @@ export async function foldPlayer(params: FoldPlayerParams) {
     double: 1,
     missPlayer: '',
     foldedPlayer: foldedUser,
-  })
+  }))
   await batch.commit()
 }

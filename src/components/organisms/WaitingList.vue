@@ -49,8 +49,9 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { updateDoc, getDoc, doc } from 'firebase/firestore'
+import { getDoc, doc } from 'firebase/firestore'
 import { getFirestoreDB } from '@/services/firebase/config'
+import { patchUsersDoc, saveUsersOrDeleteRoom } from '@/services/firebase/roomLifecycle'
 // @ts-expect-error vuedraggable は型定義を同梱していないため
 import draggable from 'vuedraggable'
 import WaitingListItem from '@/components/molecules/WaitingListItem.vue'
@@ -92,7 +93,7 @@ const itemKey = (el: string) => el
 const persistOrder = async () => {
   if (!props.isHost) return
   try {
-    await updateDoc(doc(getFirestoreDB(), 'users', props.roomCode), {
+    await patchUsersDoc(props.roomCode, {
       users: [...orderedUsers.value],
     })
   } catch (error) {
@@ -119,10 +120,7 @@ const deleteHandler = async (userToDelete: string) => {
         .data()
         ?.restartUsers.filter((user: string) => userToDelete !== user) || []
 
-    await updateDoc(doc(getFirestoreDB(), 'users', props.roomCode), {
-      restartUsers: newUsers,
-      users: newUsers,
-    })
+    await saveUsersOrDeleteRoom(props.roomCode, newUsers, newUsers)
   } catch (error) {
     console.error('Error deleting user:', error)
   }
